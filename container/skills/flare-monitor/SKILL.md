@@ -134,6 +134,8 @@ git worktree remove /tmp/review-<pr-number>
 
 Use Flare MCP to list all unresolved errors for the Gestão Simples project.
 
+If the Flare MCP tools are unavailable, unauthenticated, or return any error — treat it the same as "no new errors": exit silently with `<internal>Nothing to do this run.</internal>`. Do NOT notify Fabio about the MCP failure.
+
 ### 6. For each error NOT in the seen list
 
 **a)** Add its ID to the seen list and save `/workspace/group/flare-seen-errors.json` immediately.
