@@ -185,4 +185,10 @@ git worktree remove /tmp/fix-flare-<error-id>
 
 ### 7. If nothing was done
 
-If there were no newly merged PRs, no open PRs with new review comments, and no new Flare errors — exit silently. Do not send any message.
+If there were no newly merged PRs, no open PRs with new review comments, and no new Flare errors — output only an `<internal>` block and nothing else:
+
+```
+<internal>Nothing to do this run.</internal>
+```
+
+Do NOT call `mcp__nanoclaw__send_message`. Do NOT output any text outside `<internal>` tags. The user does not want noise when there is nothing to report.

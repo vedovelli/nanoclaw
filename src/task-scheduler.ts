@@ -17,6 +17,7 @@ import {
   getTaskById,
   logTaskRun,
   updateTaskAfterRun,
+  updateTaskNextRun,
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 import { logger } from './logger.js';
@@ -43,6 +44,17 @@ async function runTask(
     'Running scheduled task',
   );
 
+  // Advance next_run immediately so the scheduler won't re-discover this task
+  // as "due" while it's still running (which would queue a back-to-back run).
+  let immediateNextRun: string | null = null;
+  if (task.schedule_type === 'cron') {
+    const interval = CronExpressionParser.parse(task.schedule_value, { tz: TIMEZONE });
+    immediateNextRun = interval.next().toISOString();
+  } else if (task.schedule_type === 'interval') {
+    immediateNextRun = new Date(Date.now() + parseInt(task.schedule_value, 10)).toISOString();
+  }
+  updateTaskNextRun(task.id, immediateNextRun);
+
   const groups = deps.registeredGroups();
   const group = Object.values(groups).find(
     (g) => g.folder === task.group_folder,
@@ -63,6 +75,12 @@ async function runTask(
     });
     return;
   }
+
+  // If the task's chat_jid is a virtual JID (e.g. system:background) with no
+  // channel, look up its notifyJid so messages route to a real channel.
+  const chatGroup = groups[task.chat_jid];
+  const notifyJid = chatGroup?.containerConfig?.notifyJid;
+  const deliveryJid = notifyJid || task.chat_jid;
 
   // Update tasks snapshot for container to read (filtered by group)
   const isMain = task.group_folder === MAIN_GROUP_FOLDER;
@@ -113,13 +131,15 @@ async function runTask(
         chatJid: task.chat_jid,
         isMain,
         isScheduledTask: true,
+        notifyJid,
       },
       (proc, containerName) => deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
       async (streamedOutput: ContainerOutput) => {
         if (streamedOutput.result) {
           result = streamedOutput.result;
           // Forward result to user (sendMessage handles formatting)
-          await deps.sendMessage(task.chat_jid, streamedOutput.result);
+          // Use deliveryJid so virtual JIDs (e.g. system:background) route to a real channel
+          await deps.sendMessage(deliveryJid, streamedOutput.result);
           scheduleClose();
         }
         if (streamedOutput.status === 'success') {

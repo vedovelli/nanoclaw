@@ -16,7 +16,9 @@ const MESSAGES_DIR = path.join(IPC_DIR, 'messages');
 const TASKS_DIR = path.join(IPC_DIR, 'tasks');
 
 // Context from environment variables (set by the agent runner)
-const chatJid = process.env.NANOCLAW_CHAT_JID!;
+// NANOCLAW_NOTIFY_JID: delivery JID for send_message (may differ from chatJid for background tasks)
+// NANOCLAW_CHAT_JID: the processing JID (queue/group context)
+const chatJid = process.env.NANOCLAW_NOTIFY_JID || process.env.NANOCLAW_CHAT_JID!;
 const groupFolder = process.env.NANOCLAW_GROUP_FOLDER!;
 const isMain = process.env.NANOCLAW_IS_MAIN === '1';
 

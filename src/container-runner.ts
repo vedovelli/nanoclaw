@@ -42,6 +42,7 @@ export interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  notifyJid?: string;
   secrets?: Record<string, string>;
 }
 
@@ -318,6 +319,10 @@ export async function runContainerAgent(
 
     // Pass secrets via stdin (never written to disk or mounted as files)
     input.secrets = readSecrets();
+    // Propagate notifyJid from group config so background tasks can route messages
+    if (!input.notifyJid && group.containerConfig?.notifyJid) {
+      input.notifyJid = group.containerConfig.notifyJid;
+    }
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
     // Remove secrets from input so they don't appear in logs

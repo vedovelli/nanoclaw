@@ -26,6 +26,7 @@ interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  notifyJid?: string;
   secrets?: Record<string, string>;
 }
 
@@ -448,6 +449,7 @@ async function runQuery(
             NANOCLAW_CHAT_JID: containerInput.chatJid,
             NANOCLAW_GROUP_FOLDER: containerInput.groupFolder,
             NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
+            NANOCLAW_NOTIFY_JID: containerInput.notifyJid || containerInput.chatJid,
           },
         },
         gmail: {

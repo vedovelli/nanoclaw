@@ -20,6 +20,8 @@ You also have `mcp__nanoclaw__send_message` which sends a message immediately wh
 
 **Always acknowledge requests before starting work.** As your very first action for any non-trivial request, call `mcp__nanoclaw__send_message` with a brief confirmation — e.g. "Got it, on it..." or "Sure, give me a moment...". This lets the user know you received their message and are working on it. Skip this only for simple one-line answers where you can reply instantly.
 
+**Exception: scheduled tasks.** When the prompt starts with `[SCHEDULED TASK`, never send an acknowledgment. Only send messages if there is something meaningful to report.
+
 ### Internal thoughts
 
 If part of your output is internal reasoning rather than something for the user, wrap it in `<internal>` tags:

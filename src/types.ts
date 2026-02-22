@@ -30,6 +30,7 @@ export interface AllowedRoot {
 export interface ContainerConfig {
   additionalMounts?: AdditionalMount[];
   timeout?: number; // Default: 300000 (5 minutes)
+  notifyJid?: string; // Override delivery JID for send_message (used by background tasks)
 }
 
 export interface RegisteredGroup {
