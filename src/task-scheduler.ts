@@ -220,3 +220,32 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
 
   loop();
 }
+
+/**
+ * Delete container log files older than the given number of days.
+ * Runs once on startup and then every 24 hours.
+ */
+export function startLogCleanup(maxAgeDays = 7): void {
+  const clean = () => {
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    try {
+      for (const group of fs.readdirSync(GROUPS_DIR)) {
+        const logsDir = path.join(GROUPS_DIR, group, 'logs');
+        if (!fs.existsSync(logsDir)) continue;
+        for (const file of fs.readdirSync(logsDir)) {
+          if (!file.startsWith('container-')) continue;
+          const filePath = path.join(logsDir, file);
+          const { mtimeMs } = fs.statSync(filePath);
+          if (mtimeMs < cutoff) {
+            fs.unlinkSync(filePath);
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Log cleanup error');
+    }
+    setTimeout(clean, 24 * 60 * 60 * 1000);
+  };
+
+  clean();
+}

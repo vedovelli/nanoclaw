@@ -123,7 +123,28 @@ function buildVolumeMounts(
         // https://code.claude.com/docs/en/memory#manage-auto-memory
         CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
       },
+      mcpServers: {
+        github: {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-github'],
+        },
+      },
     }, null, 2) + '\n');
+  } else {
+    // Patch existing settings to add mcpServers if missing
+    try {
+      const existing = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+      if (!existing.mcpServers?.github) {
+        existing.mcpServers = {
+          ...existing.mcpServers,
+          github: {
+            command: 'npx',
+            args: ['-y', '@modelcontextprotocol/server-github'],
+          },
+        };
+        fs.writeFileSync(settingsFile, JSON.stringify(existing, null, 2) + '\n');
+      }
+    } catch { /* leave as-is if parse fails */ }
   }
 
   // Sync skills from container/skills/ into each group's .claude/skills/
@@ -142,6 +163,36 @@ function buildVolumeMounts(
     containerPath: '/home/node/.claude',
     readonly: false,
   });
+
+  // GitHub CLI config (for gh auth and git credential helper)
+  const ghConfigDir = path.join(homeDir, '.config', 'gh');
+  if (fs.existsSync(ghConfigDir)) {
+    mounts.push({
+      hostPath: ghConfigDir,
+      containerPath: '/home/node/.config/gh',
+      readonly: true,
+    });
+  }
+
+  // Gmail credentials directory
+  const gmailDir = path.join(homeDir, '.gmail-mcp');
+  if (fs.existsSync(gmailDir)) {
+    mounts.push({
+      hostPath: gmailDir,
+      containerPath: '/home/node/.gmail-mcp',
+      readonly: false,
+    });
+  }
+
+  // Google Calendar credentials directory
+  const calendarDir = path.join(homeDir, '.calendar-mcp');
+  if (fs.existsSync(calendarDir)) {
+    mounts.push({
+      hostPath: calendarDir,
+      containerPath: '/home/node/.calendar-mcp',
+      readonly: false,
+    });
+  }
 
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
@@ -182,7 +233,7 @@ function buildVolumeMounts(
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'FLARE_API_TOKEN']);
 }
 
 function buildContainerArgs(mounts: VolumeMount[], containerName: string): string[] {
