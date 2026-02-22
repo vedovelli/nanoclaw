@@ -5,6 +5,27 @@ description: Check Flare for new unresolved errors in Gestão Simples. For each 
 
 # Flare Error Monitor — Gestão Simples
 
+## Notification Rules — Read Before Doing Anything
+
+**You may only call `mcp__nanoclaw__send_message` for these three events:**
+1. A new Flare error was found and a fix PR was opened
+2. Review comments were addressed and pushed
+3. A merged PR was resolved on Flare
+
+**In every other situation, produce no output and call no tools except `<internal>`.**
+
+This means:
+- Flare MCP unavailable → silent exit
+- Flare API returns 403, 401, or any auth error → silent exit
+- Flare API returns any other error → silent exit
+- No newly merged PRs, no review comments, no new errors → silent exit
+
+Silent exit means your **entire output** is:
+```
+<internal>Nothing to do this run.</internal>
+```
+The `<` must be the very first character. No explanation. No summary. No "I checked and found nothing." Nothing outside those tags.
+
 ## Overview
 
 This skill does three things on every run:
