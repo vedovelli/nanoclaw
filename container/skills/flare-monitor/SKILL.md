@@ -186,10 +186,12 @@ git worktree remove /tmp/fix-flare-<error-id>
 
 ### 7. If nothing was done
 
-If there were no newly merged PRs, no open PRs with new review comments, and no new Flare errors — output only an `<internal>` block and nothing else:
+If there were no newly merged PRs, no open PRs with new review comments, and no new Flare errors — your entire output must be exactly this, with absolutely nothing before or after it:
 
 ```
 <internal>Nothing to do this run.</internal>
 ```
 
-Do NOT call `mcp__nanoclaw__send_message`. Do NOT output any text outside `<internal>` tags. The user does not want noise when there is nothing to report.
+**Critical:** Do NOT write any summary, reasoning, explanation, or status before the `<internal>` tag. Do NOT write anything after it. The `<` must be the very first character you output. Any text outside `<internal>` tags is forwarded to the user as a notification — including text that says you're about to use an internal block.
+
+Do NOT call `mcp__nanoclaw__send_message`. The user does not want noise when there is nothing to report.
