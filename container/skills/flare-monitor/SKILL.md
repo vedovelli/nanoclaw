@@ -48,7 +48,7 @@ done
 ### 3. Check for newly merged PRs
 
 ```bash
-gh pr list --repo vedovelli/gestao-simples --state merged --head "fix/flare-" --limit 20 --json number,title,headRefName,mergedAt,body,url
+gh pr list --repo vedovelli/gestao-simples --state merged --label "flare-fix" --limit 20 --json number,title,headRefName,mergedAt,body,url
 ```
 
 For each merged PR whose `number` is NOT in `flare-merged-prs.json`:
@@ -79,7 +79,7 @@ Fix summary:
 List all open PRs with `fix/flare-` branches:
 
 ```bash
-gh pr list --repo vedovelli/gestao-simples --state open --head "fix/flare-" --limit 20 --json number,title,headRefName,url
+gh pr list --repo vedovelli/gestao-simples --state open --label "flare-fix" --limit 20 --json number,title,headRefName,url
 ```
 
 For each open PR:
@@ -163,6 +163,7 @@ git push origin fix/flare-<error-id>
 ```bash
 gh pr create \
   --title "fix: <description>" \
+  --label "flare-fix" \
   --body "## Error
 <error title and ID from Flare>
 
