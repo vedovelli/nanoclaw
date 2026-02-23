@@ -108,8 +108,10 @@ function makeWarmOutputHandler(
   chatJid: string,
   group: RegisteredGroup,
   channel: Channel,
+  previousCursor: string,
 ): (output: ContainerOutput) => Promise<void> {
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let outputSentToUser = false;
 
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
@@ -132,6 +134,7 @@ function makeWarmOutputHandler(
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         await channel.sendMessage(chatJid, text);
+        outputSentToUser = true;
       }
       resetIdleTimer();
     }
@@ -143,7 +146,13 @@ function makeWarmOutputHandler(
     }
 
     if (output.status === 'error') {
-      logger.warn({ chatJid }, 'Warm container output error');
+      if (!outputSentToUser) {
+        lastAgentTimestamp[chatJid] = previousCursor;
+        saveState();
+        logger.warn({ chatJid }, 'Warm container error, rolled back message cursor for retry');
+      } else {
+        logger.warn({ chatJid }, 'Warm container error after output was sent, skipping cursor rollback');
+      }
       await channel.setTyping?.(chatJid, false);
       if (idleTimer) clearTimeout(idleTimer);
     }
@@ -422,7 +431,7 @@ async function startMessageLoop(): Promise<void> {
             saveState();
             // Show typing indicator while the container processes the piped message
             channel.setTyping?.(chatJid, true);
-          } else if (warmPool?.claim(chatJid, formatted, makeWarmOutputHandler(chatJid, group, channel))) {
+          } else if (warmPool?.claim(chatJid, formatted, makeWarmOutputHandler(chatJid, group, channel, lastAgentTimestamp[chatJid] || ''))) {
             logger.info(
               { chatJid, count: messagesToSend.length },
               'Warm container claimed for message',
