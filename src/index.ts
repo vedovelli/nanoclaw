@@ -3,7 +3,6 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
-  DATA_DIR,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
@@ -38,6 +37,7 @@ import {
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 import { WarmPool } from './warm-pool.js';
+import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
@@ -84,11 +84,21 @@ function saveState(): void {
 }
 
 function registerGroup(jid: string, group: RegisteredGroup): void {
+  let groupDir: string;
+  try {
+    groupDir = resolveGroupFolderPath(group.folder);
+  } catch (err) {
+    logger.warn(
+      { jid, folder: group.folder, err },
+      'Rejecting group registration with invalid folder',
+    );
+    return;
+  }
+
   registeredGroups[jid] = group;
   setRegisteredGroup(jid, group);
 
   // Create group folder
-  const groupDir = path.join(DATA_DIR, '..', 'groups', group.folder);
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
 
   logger.info(
@@ -332,6 +342,7 @@ async function runAgent(
         groupFolder: group.folder,
         chatJid,
         isMain,
+        assistantName: ASSISTANT_NAME,
       },
       (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
       wrappedOnOutput,
@@ -440,8 +451,13 @@ async function startMessageLoop(): Promise<void> {
               messagesToSend[messagesToSend.length - 1].timestamp;
             saveState();
             channel.setTyping?.(chatJid, true);
+          } else if (warmPool?.isBooting(chatJid)) {
+            // Warm container is still starting up — skip cold-start to avoid
+            // over-allocating beyond MAX_CONCURRENT_CONTAINERS. The message
+            // loop will retry on the next poll cycle once the container is ready.
+            logger.debug({ chatJid }, 'Warm container booting, deferring cold start');
           } else {
-            // No active container — enqueue for a new one
+            // No active or warm container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);
           }
         }

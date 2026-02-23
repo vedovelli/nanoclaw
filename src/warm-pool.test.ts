@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { WarmPool } from './warm-pool.js';
 
 vi.mock('./config.js', () => ({
+  ASSISTANT_NAME: 'TestAssistant',
   DATA_DIR: '/tmp/nanoclaw-test-data',
   MAX_CONCURRENT_CONTAINERS: 3,
   MAIN_GROUP_FOLDER: 'main',
@@ -73,6 +74,7 @@ describe('WarmPool', () => {
     expect(input.prompt).toBe('[STANDBY]');
     expect(input.isScheduledTask).toBe(true);
     expect(input.groupFolder).toBe('test-group');
+    expect(input.assistantName).toBeDefined();
   });
 
   it('prewarm skips if warm container already exists', async () => {
@@ -164,6 +166,22 @@ describe('WarmPool', () => {
     // entry.process is null at this point (onProcess callback not yet fired)
     expect(pool.claim('group1@g.us', 'hello', vi.fn())).toBe(false);
     expect(queue.markActive).not.toHaveBeenCalled();
+  });
+
+  it('isBooting returns true while process not yet assigned, false once ready', () => {
+    expect(pool.isBooting('group1@g.us')).toBe(false); // no entry at all
+    pool.prewarm('group1@g.us', makeGroup() as any);
+    expect(pool.isBooting('group1@g.us')).toBe(true); // entry exists, process null
+    const entry = (pool as any).warmContainers.get('group1@g.us');
+    entry.process = { exitCode: null } as any;
+    expect(pool.isBooting('group1@g.us')).toBe(false); // process assigned
+  });
+
+  it('isBooting returns false after container exits', () => {
+    pool.prewarm('group1@g.us', makeGroup() as any);
+    const entry = (pool as any).warmContainers.get('group1@g.us');
+    entry.process = { exitCode: 1 } as any; // exited
+    expect(pool.isBooting('group1@g.us')).toBe(false);
   });
 
   it('claim returns false if container has already exited', () => {

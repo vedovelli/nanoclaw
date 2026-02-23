@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { ChildProcess } from 'child_process';
 
-import { DATA_DIR, MAIN_GROUP_FOLDER, MAX_CONCURRENT_CONTAINERS } from './config.js';
+import { ASSISTANT_NAME, DATA_DIR, MAIN_GROUP_FOLDER, MAX_CONCURRENT_CONTAINERS } from './config.js';
 import { ContainerOutput, runContainerAgent } from './container-runner.js';
 import { GroupQueue } from './group-queue.js';
 import { logger } from './logger.js';
@@ -75,6 +75,7 @@ export class WarmPool {
         chatJid,
         isMain: group.folder === MAIN_GROUP_FOLDER,
         sessionId: sessionId ?? this.sessions[group.folder],
+        assistantName: ASSISTANT_NAME,
       },
       (proc, containerName) => {
         entry.process = proc;
@@ -117,6 +118,16 @@ export class WarmPool {
     setTimeout(() => {
       this.prewarm(chatJid, group, this.sessions[group.folder]);
     }, 2000);
+  }
+
+  /**
+   * Returns true when a warm container is registered for this chat but its
+   * process has not yet been assigned (still booting). Callers should not fall
+   * through to a cold start in this state — the container will be ready shortly.
+   */
+  isBooting(chatJid: string): boolean {
+    const entry = this.warmContainers.get(chatJid);
+    return entry !== undefined && entry.process === null;
   }
 
   /**
