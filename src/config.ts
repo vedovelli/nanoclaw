@@ -74,3 +74,6 @@ export const TELEGRAM_BOT_TOKEN =
   process.env.TELEGRAM_BOT_TOKEN || envConfig.TELEGRAM_BOT_TOKEN || '';
 export const TELEGRAM_ONLY =
   (process.env.TELEGRAM_ONLY || envConfig.TELEGRAM_ONLY) === 'true';
+
+export const WARM_POOL_ENABLED =
+  (process.env.WARM_POOL_ENABLED ?? 'true') !== 'false';
