@@ -451,8 +451,13 @@ async function startMessageLoop(): Promise<void> {
               messagesToSend[messagesToSend.length - 1].timestamp;
             saveState();
             channel.setTyping?.(chatJid, true);
+          } else if (warmPool?.isBooting(chatJid)) {
+            // Warm container is still starting up — skip cold-start to avoid
+            // over-allocating beyond MAX_CONCURRENT_CONTAINERS. The message
+            // loop will retry on the next poll cycle once the container is ready.
+            logger.debug({ chatJid }, 'Warm container booting, deferring cold start');
           } else {
-            // No active container — enqueue for a new one
+            // No active or warm container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);
           }
         }
