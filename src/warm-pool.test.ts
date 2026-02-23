@@ -82,11 +82,43 @@ describe('WarmPool', () => {
     expect(runContainerAgent).toHaveBeenCalledOnce();
   });
 
-  it('prewarm skips if at concurrency limit', async () => {
+  it('prewarm skips if active containers fill concurrency limit', async () => {
     const { runContainerAgent } = await import('./container-runner.js');
-    queue.getActiveCount.mockReturnValue(3);
+    queue.getActiveCount.mockReturnValue(3); // MAX_CONCURRENT_CONTAINERS = 3
     await pool.prewarm('group1@g.us', makeGroup() as any);
     expect(runContainerAgent).not.toHaveBeenCalled();
+  });
+
+  it('prewarm skips when warm standby containers alone fill concurrency limit', async () => {
+    const { runContainerAgent } = await import('./container-runner.js');
+    // Spawn 3 warm containers (fills MAX=3 with active=0)
+    pool.prewarm('g1@g.us', makeGroup('f1') as any);
+    pool.prewarm('g2@g.us', makeGroup('f2') as any);
+    pool.prewarm('g3@g.us', makeGroup('f3') as any);
+    vi.clearAllMocks();
+
+    // 4th should be blocked by warm count alone
+    await pool.prewarm('g4@g.us', makeGroup('f4') as any);
+    expect(runContainerAgent).not.toHaveBeenCalled();
+  });
+
+  it('warmCount decrements after claim, allowing a new prewarm', async () => {
+    const { runContainerAgent } = await import('./container-runner.js');
+    // Fill capacity with 3 warm containers
+    pool.prewarm('g1@g.us', makeGroup('f1') as any);
+    pool.prewarm('g2@g.us', makeGroup('f2') as any);
+    pool.prewarm('g3@g.us', makeGroup('f3') as any);
+
+    // Simulate ready process on g1 so claim() succeeds
+    const entry = (pool as any).warmContainers.get('g1@g.us');
+    entry.process = { exitCode: null } as any;
+    entry.containerName = 'ctr-1';
+    pool.claim('g1@g.us', 'hi', vi.fn()); // warmCount: 3→2
+
+    vi.clearAllMocks();
+    // Now there's room for one more warm container
+    await pool.prewarm('g4@g.us', makeGroup('f4') as any);
+    expect(runContainerAgent).toHaveBeenCalledOnce();
   });
 
   it('claim returns false when no warm container exists', () => {
@@ -96,6 +128,10 @@ describe('WarmPool', () => {
   it('claim returns true and writes IPC file when warm container exists', async () => {
     const fs = await import('fs');
     pool.prewarm('group1@g.us', makeGroup() as any);
+    // Simulate the onProcess callback having fired (container is ready)
+    const entry = (pool as any).warmContainers.get('group1@g.us');
+    entry.process = { exitCode: null } as any;
+    entry.containerName = 'ctr-1';
     const result = pool.claim('group1@g.us', 'hello world', vi.fn());
     expect(result).toBe(true);
     expect(vi.mocked(fs.default.writeFileSync)).toHaveBeenCalledWith(
@@ -107,14 +143,27 @@ describe('WarmPool', () => {
 
   it('claim calls queue.markActive with correct groupFolder', () => {
     pool.prewarm('group1@g.us', makeGroup('my-group') as any);
+    const entry = (pool as any).warmContainers.get('group1@g.us');
+    entry.process = { exitCode: null } as any;
+    entry.containerName = 'ctr-1';
     pool.claim('group1@g.us', 'hi', vi.fn());
     expect(queue.markActive).toHaveBeenCalledWith('group1@g.us', 'my-group');
   });
 
   it('claim removes entry from warm pool so second claim returns false', () => {
     pool.prewarm('group1@g.us', makeGroup() as any);
+    const entry = (pool as any).warmContainers.get('group1@g.us');
+    entry.process = { exitCode: null } as any;
+    entry.containerName = 'ctr-1';
     pool.claim('group1@g.us', 'first', vi.fn());
     expect(pool.claim('group1@g.us', 'second', vi.fn())).toBe(false);
+  });
+
+  it('claim returns false when container process not yet assigned (still starting)', () => {
+    pool.prewarm('group1@g.us', makeGroup() as any);
+    // entry.process is null at this point (onProcess callback not yet fired)
+    expect(pool.claim('group1@g.us', 'hello', vi.fn())).toBe(false);
+    expect(queue.markActive).not.toHaveBeenCalled();
   });
 
   it('claim returns false if container has already exited', () => {
@@ -149,6 +198,9 @@ describe('WarmPool', () => {
       return { status: 'success', result: null };
     });
     pool.prewarm('group1@g.us', makeGroup() as any);
+    const entry = (pool as any).warmContainers.get('group1@g.us');
+    entry.process = { exitCode: null } as any;
+    entry.containerName = 'ctr-1';
     const userHandler = vi.fn();
     pool.claim('group1@g.us', 'hi', userHandler);
     const fakeOutput = { status: 'success', result: 'Hello!', newSessionId: undefined };

@@ -10,6 +10,7 @@ const envConfig = readEnvFile([
   'ASSISTANT_HAS_OWN_NUMBER',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_ONLY',
+  'WARM_POOL_ENABLED',
 ]);
 
 export const ASSISTANT_NAME =
@@ -75,5 +76,6 @@ export const TELEGRAM_BOT_TOKEN =
 export const TELEGRAM_ONLY =
   (process.env.TELEGRAM_ONLY || envConfig.TELEGRAM_ONLY) === 'true';
 
-// Defaults to enabled — set WARM_POOL_ENABLED=false to disable
-export const WARM_POOL_ENABLED = process.env.WARM_POOL_ENABLED !== 'false';
+// Defaults to enabled — set WARM_POOL_ENABLED=false in .env or environment to disable
+export const WARM_POOL_ENABLED =
+  (process.env.WARM_POOL_ENABLED || envConfig.WARM_POOL_ENABLED || 'true') !== 'false';
