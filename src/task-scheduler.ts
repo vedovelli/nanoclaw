@@ -1,9 +1,11 @@
 import { ChildProcess } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import fs from 'fs';
+import path from 'path';
 
 import {
   ASSISTANT_NAME,
+  GROUPS_DIR,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   SCHEDULER_POLL_INTERVAL,
@@ -152,11 +154,8 @@ async function runTask(
         chatJid: task.chat_jid,
         isMain,
         isScheduledTask: true,
-<<<<<<< HEAD
         notifyJid,
-=======
         assistantName: ASSISTANT_NAME,
->>>>>>> upstream/main
       },
       (proc, containerName) => deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
       async (streamedOutput: ContainerOutput) => {
@@ -266,7 +265,6 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
   loop();
 }
 
-<<<<<<< HEAD
 /**
  * Delete container log files older than the given number of days.
  * Runs once on startup and then every 24 hours.
@@ -294,9 +292,9 @@ export function startLogCleanup(maxAgeDays = 7): void {
   };
 
   clean();
-=======
+}
+
 /** @internal - for tests only. */
 export function _resetSchedulerLoopForTests(): void {
   schedulerRunning = false;
->>>>>>> upstream/main
 }

@@ -36,11 +36,8 @@ import {
   storeMessage,
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
-<<<<<<< HEAD
 import { WarmPool } from './warm-pool.js';
-=======
 import { resolveGroupFolderPath } from './group-folder.js';
->>>>>>> upstream/main
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';

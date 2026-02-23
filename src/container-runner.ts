@@ -33,11 +33,8 @@ export interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
-<<<<<<< HEAD
   notifyJid?: string;
-=======
   assistantName?: string;
->>>>>>> upstream/main
   secrets?: Record<string, string>;
 }
 
@@ -60,6 +57,7 @@ function buildVolumeMounts(
 ): VolumeMount[] {
   const mounts: VolumeMount[] = [];
   const projectRoot = process.cwd();
+  const homeDir = process.env.HOME || '/home/user';
   const groupDir = resolveGroupFolderPath(group.folder);
 
   if (isMain) {

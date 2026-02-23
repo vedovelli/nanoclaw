@@ -26,11 +26,8 @@ interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
-<<<<<<< HEAD
   notifyJid?: string;
-=======
   assistantName?: string;
->>>>>>> upstream/main
   secrets?: Record<string, string>;
 }
 
