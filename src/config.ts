@@ -75,5 +75,5 @@ export const TELEGRAM_BOT_TOKEN =
 export const TELEGRAM_ONLY =
   (process.env.TELEGRAM_ONLY || envConfig.TELEGRAM_ONLY) === 'true';
 
-export const WARM_POOL_ENABLED =
-  (process.env.WARM_POOL_ENABLED ?? 'true') !== 'false';
+// Defaults to enabled — set WARM_POOL_ENABLED=false to disable
+export const WARM_POOL_ENABLED = process.env.WARM_POOL_ENABLED !== 'false';
