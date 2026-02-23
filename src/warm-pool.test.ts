@@ -117,6 +117,17 @@ describe('WarmPool', () => {
     expect(pool.claim('group1@g.us', 'second', vi.fn())).toBe(false);
   });
 
+  it('claim returns false if container has already exited', () => {
+    pool.prewarm('group1@g.us', makeGroup() as any);
+
+    // Simulate a crashed process by manually injecting a dead process ref
+    const entry = (pool as any).warmContainers.get('group1@g.us');
+    entry.process = { exitCode: 1 } as any; // dead process
+
+    expect(pool.claim('group1@g.us', 'hello', vi.fn())).toBe(false);
+    expect(queue.markActive).not.toHaveBeenCalled();
+  });
+
   it('standby output is discarded before claim', async () => {
     const { runContainerAgent } = await import('./container-runner.js');
     let capturedOnOutput: ((output: any) => Promise<void>) | undefined;

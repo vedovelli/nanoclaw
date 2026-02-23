@@ -130,6 +130,13 @@ export class WarmPool {
     const entry = this.warmContainers.get(chatJid);
     if (!entry) return false;
 
+    // Guard: if the container has already exited, fall through to cold start.
+    // The cleanup setTimeout will respawn it shortly.
+    if (entry.process !== null && entry.process.exitCode !== null) {
+      logger.debug({ chatJid }, 'Warm container exited before claim, falling through to cold start');
+      return false;
+    }
+
     // Activate real output handling.
     entry.onOutputRef.fn = onOutput;
     entry.claimed = true;
