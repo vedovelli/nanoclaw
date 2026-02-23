@@ -38,6 +38,7 @@ import {
 import { GroupQueue } from './group-queue.js';
 import { WarmPool } from './warm-pool.js';
 import { resolveGroupFolderPath } from './group-folder.js';
+import { startFileSender } from './file-sender.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
@@ -551,6 +552,7 @@ async function main(): Promise<void> {
       if (text) await channel.sendMessage(jid, text);
     },
   });
+  startFileSender({ channels, registeredGroups: () => registeredGroups });
   startIpcWatcher({
     sendMessage: (jid, text) => {
       const channel = findChannel(channels, jid);
