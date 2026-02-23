@@ -436,7 +436,8 @@ async function runQuery(
         'mcp__nanoclaw__*',
         'mcp__gmail__*',
         'mcp__calendar__*',
-        'mcp__flare__*'
+        'mcp__flare__*',
+        'mcp__basic-memory-cloud__*'
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -469,6 +470,11 @@ async function runQuery(
           command: 'npx',
           args: ['-y', 'mcp-remote', 'https://flareapp.io/mcp',
                  '--header', `Authorization: Bearer ${sdkEnv.FLARE_API_TOKEN || ''}`],
+        },
+        'basic-memory-cloud': {
+          command: 'npx',
+          args: ['-y', 'mcp-remote', 'https://cloud.basicmemory.com/mcp',
+                 '--header', `Authorization: Bearer ${sdkEnv.BASIC_MEMORY_API_KEY || ''}`],
         },
       },
       hooks: {
