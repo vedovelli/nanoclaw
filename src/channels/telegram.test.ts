@@ -628,6 +628,29 @@ describe('TelegramChannel', () => {
       mockFetch.mockRestore();
     });
 
+    it('falls back to placeholder when fetch returns non-OK status', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response('Not Found', { status: 404 }),
+      );
+
+      const ctx = createMediaCtx({
+        extra: { voice: { file_id: 'voice_404', duration: 2 } },
+      });
+      await triggerMediaMessage('message:voice', ctx);
+
+      expect(mockTranscribeAudioBuffer).not.toHaveBeenCalled();
+      expect(opts.onMessage).toHaveBeenCalledWith(
+        'tg:100200300',
+        expect.objectContaining({ content: '[Voice message]' }),
+      );
+
+      mockFetch.mockRestore();
+    });
+
     it('falls back to placeholder when voice download fails', async () => {
       const opts = createTestOpts();
       const channel = new TelegramChannel('test-token', opts);

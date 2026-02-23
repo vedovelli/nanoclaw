@@ -167,11 +167,16 @@ export class TelegramChannel implements Channel {
         const file = await this.bot!.api.getFile(ctx.message.voice.file_id);
         const url = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
         const res = await fetch(url);
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const transcript = await transcribeAudioBuffer(buffer);
-        content = transcript
-          ? `[Voice: ${transcript}]`
-          : '[Voice message]';
+        if (!res.ok) {
+          logger.warn({ status: res.status }, 'Telegram voice file download returned non-OK');
+          content = '[Voice message]';
+        } else {
+          const buffer = Buffer.from(await res.arrayBuffer());
+          const transcript = await transcribeAudioBuffer(buffer);
+          content = transcript
+            ? `[Voice: ${transcript}]`
+            : '[Voice message]';
+        }
       } catch (err) {
         logger.error({ err }, 'Telegram voice download/transcription failed');
         content = '[Voice message]';
