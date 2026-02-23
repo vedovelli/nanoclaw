@@ -260,6 +260,7 @@ export class TelegramChannel implements Channel {
       logger.info({ jid, filename }, 'Telegram file sent');
     } catch (err) {
       logger.error({ jid, filename: filename, err }, 'Failed to send Telegram file');
+      throw err;
     }
   }
 

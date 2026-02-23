@@ -257,6 +257,19 @@ The file must exist in /workspace/group/. Use a relative path like "report.pdf".
       }
 
       const stat = fs.statSync(fullPath);
+
+      if (!stat.isFile()) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Error: ${args.file_path} is not a file`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const MAX_SIZE = 50 * 1024 * 1024;
       if (stat.size > MAX_SIZE) {
         return {
