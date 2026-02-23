@@ -318,6 +318,43 @@ export class GroupQueue {
     }
   }
 
+  /**
+   * Expose active container count for capacity checks (used by WarmPool).
+   */
+  getActiveCount(): number {
+    return this.activeCount;
+  }
+
+  /**
+   * Register an externally-managed container as active for a group.
+   * Called by WarmPool when claiming a warm container for a real message.
+   * Enables queue.sendMessage() to pipe follow-up messages to the container.
+   */
+  markActive(groupJid: string, groupFolder: string): void {
+    if (this.shuttingDown) return;
+    const state = this.getGroup(groupJid);
+    state.active = true;
+    state.isTaskContainer = false;
+    state.groupFolder = groupFolder;
+    this.activeCount++;
+  }
+
+  /**
+   * Mark an externally-managed container as no longer active.
+   * Called by WarmPool when the claimed warm container exits.
+   * Triggers queue drain so any pending work can start.
+   */
+  markInactive(groupJid: string): void {
+    const state = this.getGroup(groupJid);
+    if (!state.active) return; // guard against double-deactivation
+    state.active = false;
+    state.process = null;
+    state.containerName = null;
+    state.groupFolder = null;
+    this.activeCount--;
+    this.drainGroup(groupJid);
+  }
+
   async shutdown(_gracePeriodMs: number): Promise<void> {
     this.shuttingDown = true;
 
