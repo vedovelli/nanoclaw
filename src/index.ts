@@ -10,6 +10,7 @@ import {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_ONLY,
   TRIGGER_PATTERN,
+  WARM_POOL_ENABLED,
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
 import { TelegramChannel } from './channels/telegram.js';
@@ -36,6 +37,7 @@ import {
   storeMessage,
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
+import { WarmPool } from './warm-pool.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
@@ -54,6 +56,7 @@ let messageLoopRunning = false;
 let whatsapp: WhatsAppChannel;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
+const warmPool = WARM_POOL_ENABLED ? new WarmPool(queue) : null;
 
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
@@ -92,6 +95,68 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
     { jid, name: group.name, folder: group.folder },
     'Group registered',
   );
+  warmPool?.prewarm(jid, group, sessions[group.folder]).catch((err) =>
+    logger.warn({ jid, err }, 'Failed to prewarm container'),
+  );
+}
+
+/**
+ * Output handler factory for warm-pool claimed containers.
+ * Mirrors processGroupMessages: strips <internal> tags, sends to channel, tracks session, resets idle.
+ */
+function makeWarmOutputHandler(
+  chatJid: string,
+  group: RegisteredGroup,
+  channel: Channel,
+  previousCursor: string,
+): (output: ContainerOutput) => Promise<void> {
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let outputSentToUser = false;
+
+  const resetIdleTimer = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      logger.debug({ group: group.name }, 'Idle timeout, closing container stdin');
+      queue.closeStdin(chatJid);
+    }, IDLE_TIMEOUT);
+  };
+
+  return async (output: ContainerOutput) => {
+    if (output.newSessionId) {
+      sessions[group.folder] = output.newSessionId;
+      setSession(group.folder, output.newSessionId);
+      warmPool?.updateSession(group.folder, output.newSessionId);
+    }
+
+    if (output.result) {
+      const raw = typeof output.result === 'string' ? output.result : JSON.stringify(output.result);
+      const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+      logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
+      if (text) {
+        await channel.sendMessage(chatJid, text);
+        outputSentToUser = true;
+      }
+      resetIdleTimer();
+    }
+
+    if (output.status === 'success') {
+      queue.notifyIdle(chatJid);
+      await channel.setTyping?.(chatJid, false);
+      if (idleTimer) clearTimeout(idleTimer);
+    }
+
+    if (output.status === 'error') {
+      if (!outputSentToUser) {
+        lastAgentTimestamp[chatJid] = previousCursor;
+        saveState();
+        logger.warn({ chatJid }, 'Warm container error, rolled back message cursor for retry');
+      } else {
+        logger.warn({ chatJid }, 'Warm container error after output was sent, skipping cursor rollback');
+      }
+      await channel.setTyping?.(chatJid, false);
+      if (idleTimer) clearTimeout(idleTimer);
+    }
+  };
 }
 
 /**
@@ -252,6 +317,7 @@ async function runAgent(
         if (output.newSessionId) {
           sessions[group.folder] = output.newSessionId;
           setSession(group.folder, output.newSessionId);
+          warmPool?.updateSession(group.folder, output.newSessionId);
         }
         await onOutput(output);
       }
@@ -274,6 +340,7 @@ async function runAgent(
     if (output.newSessionId) {
       sessions[group.folder] = output.newSessionId;
       setSession(group.folder, output.newSessionId);
+      warmPool?.updateSession(group.folder, output.newSessionId);
     }
 
     if (output.status === 'error') {
@@ -364,6 +431,15 @@ async function startMessageLoop(): Promise<void> {
             saveState();
             // Show typing indicator while the container processes the piped message
             channel.setTyping?.(chatJid, true);
+          } else if (warmPool?.claim(chatJid, formatted, makeWarmOutputHandler(chatJid, group, channel, lastAgentTimestamp[chatJid] || ''))) {
+            logger.info(
+              { chatJid, count: messagesToSend.length },
+              'Warm container claimed for message',
+            );
+            lastAgentTimestamp[chatJid] =
+              messagesToSend[messagesToSend.length - 1].timestamp;
+            saveState();
+            channel.setTyping?.(chatJid, true);
           } else {
             // No active container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);
@@ -405,6 +481,15 @@ async function main(): Promise<void> {
   initDatabase();
   logger.info('Database initialized');
   loadState();
+
+  // Prewarm containers for all registered groups
+  if (warmPool) {
+    for (const [jid, group] of Object.entries(registeredGroups)) {
+      warmPool.prewarm(jid, group, sessions[group.folder]).catch((err) =>
+        logger.warn({ jid, err }, 'Failed to prewarm container on startup'),
+      );
+    }
+  }
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {

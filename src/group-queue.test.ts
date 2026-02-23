@@ -378,6 +378,62 @@ describe('GroupQueue', () => {
     await vi.advanceTimersByTimeAsync(10);
   });
 
+  describe('markActive / markInactive / getActiveCount', () => {
+    it('markActive enables sendMessage for a group', async () => {
+      queue.markActive('group1@g.us', 'test-folder');
+      // sendMessage now returns true (active + folder set)
+      expect(queue.sendMessage('group1@g.us', 'hi')).toBe(true);
+    });
+
+    it('sendMessage returns false before markActive', () => {
+      expect(queue.sendMessage('group1@g.us', 'hi')).toBe(false);
+    });
+
+    it('markInactive disables sendMessage', () => {
+      queue.markActive('group1@g.us', 'test-folder');
+      expect(queue.sendMessage('group1@g.us', 'hi')).toBe(true);
+      queue.markInactive('group1@g.us');
+      expect(queue.sendMessage('group1@g.us', 'hi')).toBe(false);
+    });
+
+    it('getActiveCount reflects markActive and markInactive', () => {
+      expect(queue.getActiveCount()).toBe(0);
+      queue.markActive('group1@g.us', 'folder1');
+      expect(queue.getActiveCount()).toBe(1);
+      queue.markActive('group2@g.us', 'folder2');
+      expect(queue.getActiveCount()).toBe(2);
+      queue.markInactive('group1@g.us');
+      expect(queue.getActiveCount()).toBe(1);
+    });
+
+    it('markInactive triggers drain — waiting group gets a slot', async () => {
+      const processMessages = vi.fn(async () => true);
+      queue.setProcessMessagesFn(processMessages);
+
+      // Fill both slots via markActive (limit is 2)
+      queue.markActive('group1@g.us', 'folder1');
+      queue.markActive('group2@g.us', 'folder2');
+
+      // Queue group3 while at limit
+      queue.enqueueMessageCheck('group3@g.us');
+      await vi.advanceTimersByTimeAsync(10);
+      expect(processMessages).not.toHaveBeenCalled(); // still blocked
+
+      // Releasing group1 should let group3 run
+      queue.markInactive('group1@g.us');
+      await vi.advanceTimersByTimeAsync(10);
+      expect(processMessages).toHaveBeenCalledWith('group3@g.us');
+    });
+
+    it('markInactive is idempotent — double call does not corrupt activeCount', () => {
+      queue.markActive('group1@g.us', 'folder1');
+      queue.markInactive('group1@g.us');
+      expect(queue.getActiveCount()).toBe(0);
+      queue.markInactive('group1@g.us'); // second call — no-op
+      expect(queue.getActiveCount()).toBe(0);
+    });
+  });
+
   it('preempts when idle arrives with pending tasks', async () => {
     const fs = await import('fs');
     let resolveProcess: () => void;
