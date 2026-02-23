@@ -2,6 +2,7 @@ import { Bot } from 'grammy';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
 import { logger } from '../logger.js';
+import { transcribeAudioBuffer } from '../transcription.js';
 import {
   Channel,
   OnChatMetadata,
@@ -149,9 +150,50 @@ export class TelegramChannel implements Channel {
 
     this.bot.on('message:photo', (ctx) => storeNonText(ctx, '[Photo]'));
     this.bot.on('message:video', (ctx) => storeNonText(ctx, '[Video]'));
-    this.bot.on('message:voice', (ctx) =>
-      storeNonText(ctx, '[Voice message]'),
-    );
+    this.bot.on('message:voice', async (ctx) => {
+      const chatJid = `tg:${ctx.chat.id}`;
+      const group = this.opts.registeredGroups()[chatJid];
+      if (!group) return;
+
+      const timestamp = new Date(ctx.message.date * 1000).toISOString();
+      const senderName =
+        ctx.from?.first_name ||
+        ctx.from?.username ||
+        ctx.from?.id?.toString() ||
+        'Unknown';
+
+      let content: string;
+      try {
+        const file = await this.bot!.api.getFile(ctx.message.voice.file_id);
+        const url = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
+        const res = await fetch(url);
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const transcript = await transcribeAudioBuffer(buffer);
+        content = transcript
+          ? `[Voice: ${transcript}]`
+          : '[Voice message]';
+      } catch (err) {
+        logger.error({ err }, 'Telegram voice download/transcription failed');
+        content = '[Voice message]';
+      }
+
+      const caption = ctx.message.caption ? ` ${ctx.message.caption}` : '';
+      this.opts.onChatMetadata(chatJid, timestamp);
+      this.opts.onMessage(chatJid, {
+        id: ctx.message.message_id.toString(),
+        chat_jid: chatJid,
+        sender: ctx.from?.id?.toString() || '',
+        sender_name: senderName,
+        content: `${content}${caption}`,
+        timestamp,
+        is_from_me: false,
+      });
+
+      logger.info(
+        { chatJid, sender: senderName },
+        'Telegram voice message processed',
+      );
+    });
     this.bot.on('message:audio', (ctx) => storeNonText(ctx, '[Audio]'));
     this.bot.on('message:document', (ctx) => {
       const name = ctx.message.document?.file_name || 'file';
