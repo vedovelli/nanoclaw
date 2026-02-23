@@ -345,6 +345,7 @@ export class GroupQueue {
    * Triggers queue drain so any pending work can start.
    */
   markInactive(groupJid: string): void {
+    if (this.shuttingDown) return;
     const state = this.getGroup(groupJid);
     if (!state.active) return; // guard against double-deactivation
     state.active = false;
