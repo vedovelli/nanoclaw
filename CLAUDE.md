@@ -38,6 +38,8 @@ Single Node.js process that connects to WhatsApp, routes messages to Claude Agen
 | `/customize` | Adding channels, integrations, changing behavior |
 | `/debug` | Container issues, logs, troubleshooting |
 | `/update` | Pull upstream NanoClaw changes, merge with customizations, run migrations |
+| `/ved-sync-upstream` | Pull upstream changes into a branch + PR for human review before merging |
+| `/ved-add-customization` | Protocol checklist before customizing any upstream file — markers, tracker, build |
 
 ## Development
 
