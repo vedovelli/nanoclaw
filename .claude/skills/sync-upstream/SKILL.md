@@ -204,17 +204,37 @@ Show the PR URL to the user.
 
 ## 12. Regression check
 
-After opening the PR, verify all customizations are still intact. For each item in the customizations tracker, confirm the relevant file contains the expected code.
+After opening the PR, **read each file listed below in full** — do not grep for keywords. Presence of a string is not sufficient; ordering, context, and completeness all matter.
 
-Key files to spot-check:
-- `src/container-runner.ts` — `notifyJid`, `homeDir`, extra secrets in `readSecrets()`
-- `src/task-scheduler.ts` — `notifyJid`, `GROUPS_DIR`
-- `src/index.ts` — `WarmPool`, `startFileSender`
-- `container/agent-runner/src/index.ts` — `notifyJid`, all MCP servers (gmail, calendar, flare, basic-memory-cloud), tool permissions
-- `container/Dockerfile` — gh CLI install, MCP servers pre-installed, `git safe.directory`
-- `container/skills/` — all custom skills still present
+**`src/container-runner.ts`** — Read the entire `buildVolumeMounts` function and verify:
+- `homeDir` is declared and used
+- gh config mount block (`~/.config/gh` → `/home/node/.config/gh`) is present
+- Gmail mount block (`~/.gmail-mcp` → `/home/node/.gmail-mcp`) is present
+- Calendar mount block (`~/.calendar-mcp` → `/home/node/.calendar-mcp`) is present
+- `notifyJid?: string` is in the `ContainerInput` interface
+- `readSecrets()` includes `GITHUB_PERSONAL_ACCESS_TOKEN`, `FLARE_API_TOKEN`, `BASIC_MEMORY_API_KEY`
 
-If anything is missing, fix it, commit to the sync branch, and push before requesting review.
+**`src/task-scheduler.ts`** — Verify:
+- `GROUPS_DIR` is in the import from `./config.js`
+- `notifyJid` is extracted from `containerConfig` and passed to `runContainerAgent`
+
+**`src/index.ts`** — Verify:
+- `WarmPool` is imported and used
+- `startFileSender` is imported and called
+
+**`container/agent-runner/src/index.ts`** — Verify:
+- `notifyJid?: string` is in the `ContainerInput` interface
+- `mcp__gmail__*`, `mcp__calendar__*`, `mcp__flare__*`, `mcp__basic-memory-cloud__*` are in `allowedTools`
+- `gmail`, `calendar`, `flare`, `basic-memory-cloud` server blocks are all present in `mcpServers`
+
+**`container/Dockerfile`** — Read the full file and verify:
+- gh CLI install block is present
+- MCP servers (`@gongrzhe/server-gmail-autoauth-mcp`, `@cocal/google-calendar-mcp`, `mcp-remote`) are pre-installed
+- `git config --global --add safe.directory '*'` appears **after** `USER node`
+
+**`container/skills/`** — Verify `flare-monitor/` and `send-link/` directories are present.
+
+If anything is missing or misplaced, fix it, commit to the sync branch, and push before requesting review.
 
 ## 13. Cleanup
 
