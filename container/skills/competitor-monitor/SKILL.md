@@ -52,11 +52,17 @@ Also read `Concorrência/Monitoramento Diário - Perguntas de Análise` to under
 
 Store the content of both snapshots in memory for comparison in step 5.
 
-Also check whether `Concorrência/Faros AI/$TODAY` already exists in Basic Memory.
-If it does, today's run already completed successfully. Exit silently:
+Also check whether `Concorrência/Run/$TODAY` already exists in Basic Memory (`project: "dev-visibility-product"`).
+If it does, today's run already completed. Exit silently:
 ```
 <internal>Already ran today.</internal>
 ```
+
+If it does NOT exist, write it now before proceeding:
+- **Title:** `Concorrência/Run/$TODAY`
+- **Content:** `Run started at $TODAY.`
+
+This sentinel is written before any research begins, so re-runs triggered by container crashes or scheduler retries will not produce duplicate emails.
 
 Additionally, always read `Concorrência/Faros AI - Análise Competitiva` and `Concorrência/Jellyfish - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for both competitors. Store these for use in step 7 when applying the `high-threat` CSS class.
 
@@ -142,6 +148,10 @@ If both `FAROS_CHANGES` and `JELLYFISH_CHANGES` are empty → exit:
 
 ### 7. Generate HTML report
 
+**Ação Necessária decision rule:**
+- If any change item matches a "Sinais de Alerta" entry (i.e. has `high-threat` class) → write **alertar founder**
+- If changes exist but none are high-threat → write **atualizar nota de análise**
+
 Write to `/tmp/competitor-report-$TODAY.html`. Use clean, readable HTML with inline CSS. Structure:
 
 ```html
@@ -178,7 +188,14 @@ Write to `/tmp/competitor-report-$TODAY.html`. Use clean, readable HTML with inl
   <p>[Analysis: do any of these changes reduce our differentiation? Did threat level change?]</p>
 
   <h2>Ação Necessária</h2>
-  <p>[nenhuma | atualizar nota de análise | alertar founder]</p>
+  <p>
+    <!-- Decision logic:
+         - If ANY change-item has the high-threat class → "alertar founder"
+         - If changes exist but none are high-threat → "atualizar nota de análise"
+         - If this section is somehow reached with no changes → "nenhuma"
+    -->
+    [alertar founder | atualizar nota de análise | nenhuma]
+  </p>
 
   <footer>Gerado automaticamente pelo NanoClaw competitor-monitor às 05:00 BRT</footer>
 </body>
@@ -190,6 +207,7 @@ Use `high-threat` CSS class on items that match the "Sinais de Alerta" sections 
 ### 8. Convert HTML to PDF via Chromium headless
 
 ```bash
+command -v /usr/bin/chromium >/dev/null 2>&1 || { echo "chromium not found at /usr/bin/chromium"; exit 0; }
 /usr/bin/chromium --headless --no-sandbox \
   --print-to-pdf=/tmp/competitor-report-$TODAY.pdf \
   --print-to-pdf-no-header \
@@ -222,8 +240,36 @@ If the Gmail send fails for any reason, do not retry and do not notify. Exit sil
 Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product"` for each competitor:
 
 **Title:** `Concorrência/Faros AI/$TODAY`
-**Content:** Markdown with everything found today (raw findings, not just changes). This becomes tomorrow's baseline.
+**Content:** Use this exact Markdown schema (omit sections with no data):
+
+```markdown
+## Blog Posts
+- [title] — [date] — [url]
+
+## Releases
+- [repo] [tag] — [published_at] — [key changes summary]
+
+## Merged PRs (significant)
+- [title] — [merged_at]
+
+## Product Page (Clara)
+[Notable copy or feature changes observed]
+
+## Announcements
+[Any banners, press releases, or notable homepage content]
+```
 
 **Title:** `Concorrência/Jellyfish/$TODAY`
-**Content:** Same structure for Jellyfish.
+**Content:** Use this exact Markdown schema (omit sections with no data):
+
+```markdown
+## Blog Posts
+- [title] — [date] — [url]
+
+## Product Page (AI Impact Dashboard)
+[Notable copy, feature additions, or new supported tools observed]
+
+## Announcements
+[Any banners, press releases, or notable homepage content]
+```
 
