@@ -59,7 +59,8 @@ If it does, today's run already completed. Exit silently:
 ```
 
 If it does NOT exist, write it now before proceeding:
-- **Title:** `Concorrência/Run/$TODAY`
+- **Title:** `$TODAY`
+- **Directory:** `Concorrência/Run`
 - **Content:** `Run started at $TODAY.`
 
 This sentinel is written before any research begins, so re-runs triggered by container crashes or scheduler retries will not produce duplicate emails.
@@ -239,7 +240,8 @@ If the Gmail send fails for any reason, do not retry and do not notify. Exit sil
 
 Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product"` for each competitor:
 
-**Title:** `Concorrência/Faros AI/$TODAY`
+**Title:** `$TODAY`
+**Directory:** `Concorrência/Faros AI`
 **Content:** Use this exact Markdown schema (omit sections with no data):
 
 ```markdown
@@ -259,7 +261,8 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 [Any banners, press releases, or notable homepage content]
 ```
 
-**Title:** `Concorrência/Jellyfish/$TODAY`
+**Title:** `$TODAY`
+**Directory:** `Concorrência/Jellyfish`
 **Content:** Use this exact Markdown schema (omit sections with no data):
 
 ```markdown
