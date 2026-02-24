@@ -231,7 +231,7 @@ Also verify custom skills are intact:
 ```bash
 ls container/skills/
 ```
-`flare-monitor/` and `send-link/` must be present.
+`flare-monitor/`, `send-link/` and `competitor-monitor/` must be present.
 
 If anything is missing or misplaced, fix it, commit to the sync branch, and push before requesting review.
 
