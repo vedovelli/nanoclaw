@@ -83,6 +83,7 @@ USER node
 RUN git config --global --add safe.directory '*'
 # ved custom end
 
+
 # Set working directory to group workspace
 WORKDIR /workspace/group
 
