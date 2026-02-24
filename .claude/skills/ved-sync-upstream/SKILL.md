@@ -1,5 +1,5 @@
 ---
-name: sync-upstream
+name: ved-sync-upstream
 description: "Use when pulling upstream NanoClaw changes into your fork via a review branch and PR, rather than applying directly to main."
 ---
 
@@ -48,7 +48,7 @@ git branch --show-current
 Run the fetch script:
 
 ```bash
-./.claude/skills/sync-upstream/scripts/fetch-upstream.sh
+./.claude/skills/ved-sync-upstream/scripts/fetch-upstream.sh
 ```
 
 Parse the structured status block between `<<< STATUS` and `STATUS >>>` markers. Extract:
