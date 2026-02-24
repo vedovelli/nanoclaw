@@ -250,6 +250,24 @@ Report final status:
 - Any warnings (failed custom patches, failed skill tests, migration issues)
 - Reminder: "Review and merge the PR, then restart the service"
 
+## 14. Session report
+
+After the sync is complete (PR merged, service restarted, verified working), write a session report to Basic Memory Cloud:
+
+- Project: `nanoclaw`
+- Directory: `reports`
+- Title: `Upstream Sync v<NEW_VERSION> — Session Report (YYYY-MM-DD)`
+- Tags: `upstream-sync`, `v<NEW_VERSION>`, `session-report`
+- Tool: `mcp__basic-memory-cloud__write_note`
+
+The report should cover:
+- **What changed upstream** — key changes from the new version
+- **Merge conflicts** — which files conflicted and how they were resolved
+- **Regressions found** — any issues caught during regression check, how they were fixed, and how they were discovered
+- **New customizations added** — any new `ved custom` blocks or skills created during this session
+- **Infrastructure changes** — Node version, plist, container rebuild, etc.
+- **Lessons learned** — anything that should inform future syncs
+
 ## Troubleshooting
 
 **No upstream remote:** The fetch script auto-adds `upstream` pointing to `https://github.com/qwibitai/nanoclaw.git`. If you forked from a different URL, set it manually: `git remote add upstream <url>`.
