@@ -167,6 +167,7 @@ npm run build && npm test
 **If build fails:** Show the error. Common causes:
 - Type errors from merged files — read the error, fix, retry
 - Missing dependencies — run `npm install` first, retry
+- `better-sqlite3` native module mismatch — run `npm rebuild better-sqlite3`. If it persists, delete `node_modules/better-sqlite3` and `npm install better-sqlite3`. The `.nvmrc` and launchd plist must agree on the same Node major version.
 
 **If tests fail:** Show which tests failed. Try to diagnose and fix. If you can't fix automatically, report to the user and stop before pushing.
 
