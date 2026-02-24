@@ -1,6 +1,6 @@
 ---
 name: competitor-monitor
-description: Daily competitive intelligence monitor for Faros AI and Jellyfish. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Basic Memory; generates a PDF report and sends by email when changes are found.
+description: Daily competitive intelligence monitor for Faros AI and Jellyfish. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Basic Memory; sends an HTML report by email when changes are found; maintains a persistent timeline; creates GitHub issues for features relevant to Dev Visibility.
 ---
 
 # Competitor Monitor — Dev Visibility
@@ -26,7 +26,7 @@ This skill does the following on every run:
 3. Researches Faros AI (GitHub API + browser) and Jellyfish (browser)
 4. Compares findings with yesterday's snapshot
 5. If no changes in either competitor → silent exit
-6. If changes found → generates HTML report → converts to PDF via Chromium → sends by email → saves today's snapshots to Basic Memory
+6. If changes found → generates HTML report → sends as HTML email body → updates timeline in Basic Memory → saves daily snapshots → creates GitHub issues for Dev Visibility-relevant features
 
 ## Steps
 
@@ -67,6 +67,13 @@ This sentinel is written before any research begins, so re-runs triggered by con
 
 Additionally, always read `Concorrência/Faros AI - Análise Competitiva` and `Concorrência/Jellyfish - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for both competitors. Store these for use in step 7 when applying the `high-threat` CSS class.
 
+Also read these two product documents from Basic Memory (`project: "dev-visibility-product"`) to understand what Dev Visibility is building. You will use this context in steps 3–4 to identify competitor features worth turning into GitHub issues:
+
+- `design/PRD - PoC Single-User v1.0` (primary — what we're building now)
+- `design/PRD - MVP Enterprise-Ready` (secondary — future direction)
+
+Store the key capabilities and differentiators from both PRDs in memory.
+
 ### 3. Research Faros AI
 
 **a) GitHub releases (faros-community-edition):**
@@ -103,6 +110,15 @@ Use `agent-browser` to fetch `https://faros.ai/blog`. Extract post titles, dates
 
 Use `agent-browser` to fetch `https://faros.ai/clara`. Note any visible changes, new features, or new copy compared to what was in yesterday's snapshot.
 
+**f) Tag Dev Visibility candidates:**
+
+For each item found in sub-steps a–e, check against the PRD capabilities read in step 2. Mark any item as `[DEV_VISIBILITY_CANDIDATE]` if it:
+- Implements a feature that Dev Visibility is also planning to build
+- Represents a capability that directly reduces our differentiation
+- Uses a technology pattern (MCP, hooks, knowledge graph, session capture) that is core to our architecture
+
+Store the list of candidates separately from the general change list.
+
 If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Faros AI as having no changes for today.
 
 ### 4. Research Jellyfish
@@ -120,6 +136,10 @@ Use `agent-browser` to fetch `https://jellyfish.co/platform/jellyfish-ai-impact/
 **c) Homepage/announcements:**
 
 Use `agent-browser` to check `https://jellyfish.co` for any banners or featured announcements.
+
+**d) Tag Dev Visibility candidates:**
+
+Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDIDATE]` if it aligns with PRD capabilities or reduces Dev Visibility's differentiation.
 
 If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Jellyfish as having no changes for today.
 
@@ -205,36 +225,61 @@ Write to `/tmp/competitor-report-$TODAY.html`. Use clean, readable HTML with inl
 
 Use `high-threat` CSS class on items that match the "Sinais de Alerta" sections from the base analysis documents.
 
-### 8. Convert HTML to PDF via Chromium headless
+### 8. Send HTML report by email
 
-```bash
-command -v /usr/bin/chromium >/dev/null 2>&1 || { echo "chromium not found at /usr/bin/chromium"; exit 0; }
-/usr/bin/chromium --headless --no-sandbox \
-  --print-to-pdf=/tmp/competitor-report-$TODAY.pdf \
-  --print-to-pdf-no-header \
-  file:///tmp/competitor-report-$TODAY.html
-```
-
-Verify the PDF was created:
-```bash
-ls -lh /tmp/competitor-report-$TODAY.pdf
-```
-
-If the file is 0 bytes or doesn't exist, log internally and skip sending — do not notify.
-
-### 9. Send by email via Gmail
-
-Use `mcp__gmail__*` to send:
+Read the content of `/tmp/competitor-report-$TODAY.html` and send it as the email body:
 
 - **To:** fabio@vedovelli.com.br
 - **Subject:** `[Dev Visibility] Competitive Intelligence — $TODAY`
-- **Body:** Plain text summary of the key changes (2–4 lines)
-- **Attachment:** `/tmp/competitor-report-$TODAY.pdf`
+- **Body:** Full HTML content of the report (the file generated in step 7)
+- **mimeType:** `text/html`
+- **No attachments**
 
-If the Gmail send fails for any reason, do not retry and do not notify. Exit silently — skip step 10:
+### 9. Update Timeline in Basic Memory
+
+After the email is sent, update the persistent timeline document in `dev-visibility-product`.
+
+**a)** Check if `Concorrência/Timeline de Melhorias` exists using `mcp__basic-memory-cloud__read_note`.
+
+**b)** Prepare today's timeline entry using this structure:
+
+```markdown
+## $TODAY
+
+### [Competitor name — repeat section for each competitor with changes]
+
+**[🔴 ALTO | 🟡 MÉDIO | ⚪ BAIXO] [Title of change]**
+- Tipo: [blog post | release | PR | product update | announcement | partnership]
+- Impacto: [one sentence on why this matters for Dev Visibility]
+- Fonte: [URL if available]
 ```
-<internal>Gmail send failed.</internal>
+
+Classification rules:
+- **🔴 ALTO** — matches a "Sinais de Alerta" entry or is tagged `[DEV_VISIBILITY_CANDIDATE]`
+- **🟡 MÉDIO** — relevant but not critical (strategic messaging, notable blog post)
+- **⚪ BAIXO** — informational (generic content, minor release)
+
+**c)** If the timeline document exists: use `mcp__basic-memory-cloud__edit_note` with `operation: "prepend"` to add today's entry at the top.
+
+**d)** If it does NOT exist: create it with `mcp__basic-memory-cloud__write_note`:
+- **Title:** `Timeline de Melhorias`
+- **Directory:** `Concorrência`
+- **project:** `dev-visibility-product`
+- **Content:** Header + today's entry:
+
+```markdown
+# Timeline de Melhorias Detectadas nos Concorrentes
+
+Histórico cronológico de features, parcerias e movimentos estratégicos detectados pelo competitor-monitor.
+
+---
+
+[today's entry here]
 ```
+
+If the timeline update fails for any reason, continue silently — do not abort.
+
+> **If the Gmail send in step 8 failed:** continue to steps 9–11 anyway — the timeline and snapshots should still be saved. Only the email notification is skipped.
 
 ### 10. Save today's snapshots to Basic Memory
 
@@ -276,3 +321,59 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 [Any banners, press releases, or notable homepage content]
 ```
 
+### 11. Create GitHub issues for Dev Visibility-relevant features
+
+For each item marked `[DEV_VISIBILITY_CANDIDATE]` in steps 3 and 4:
+
+**a)** Check for duplicate issues to avoid noise:
+
+```bash
+gh issue list \
+  --repo vedovelli/dev-visibility-application \
+  --search "[Competitor name] [feature keywords]" \
+  --state open \
+  --json number,title \
+  --limit 5
+```
+
+If a similar issue already exists (same competitor + same feature topic), skip creation for this item.
+
+**b)** Create the issue:
+
+```bash
+gh issue create \
+  --repo vedovelli/dev-visibility-application \
+  --title "Feature from [Competitor]: [Feature Name]" \
+  --label "competitive-intel" \
+  --body "$(cat <<'ISSUE'
+## Feature Detectada em [Competitor]
+
+[Descrição da funcionalidade]
+
+## Por que é Relevante para Dev Visibility
+
+[Análise de relevância baseada nos PRDs — qual capability do nosso produto esta feature toca ou ameaça]
+
+## Implementação no Concorrente
+
+- **Fonte:** [PR URL | blog post URL | product page URL]
+- **Data:** [date detected]
+
+## Próximos Passos
+
+- [ ] Analisar implementação em detalhe
+- [ ] Avaliar se se encaixa no roadmap
+- [ ] Estimar esforço de implementação
+
+---
+Detectado automaticamente por competitor-monitor em $TODAY
+ISSUE
+)"
+```
+
+**c)** Notify via `mcp__nanoclaw__send_message`:
+> "📋 Nova issue criada no Dev Visibility: [Feature Name] detectada em [Competitor]\nIssue: [GitHub URL]"
+
+**d)** If no candidates were found, skip silently — do not notify.
+
+**e)** If `gh issue create` fails, skip silently — do not abort the run.
