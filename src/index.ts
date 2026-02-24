@@ -36,9 +36,11 @@ import {
   storeMessage,
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
+/* ved custom */
 import { WarmPool } from './warm-pool.js';
-import { resolveGroupFolderPath } from './group-folder.js';
 import { startFileSender } from './file-sender.js';
+/* ved custom end */
+import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
@@ -552,7 +554,7 @@ async function main(): Promise<void> {
       if (text) await channel.sendMessage(jid, text);
     },
   });
-  startFileSender({ channels, registeredGroups: () => registeredGroups });
+  /* ved custom */ startFileSender({ channels, registeredGroups: () => registeredGroups }); /* ved custom end */
   startIpcWatcher({
     sendMessage: (jid, text) => {
       const channel = findChannel(channels, jid);

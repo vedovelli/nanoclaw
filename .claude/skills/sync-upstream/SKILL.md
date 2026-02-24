@@ -117,7 +117,15 @@ Parse the JSON output. The result has: `success`, `previousVersion`, `newVersion
 
 **If backupPending=true:** There are unresolved merge conflicts.
 
-**When uncertain about what a local change is doing or why it exists**, consult the customizations tracking document in Basic Memory Cloud before resolving:
+**Before resolving any conflict**, search for `ved custom` markers in the conflicted file:
+
+```bash
+grep -n "ved custom" <file>
+```
+
+Any code between `/* ved custom */` and `/* ved custom end */` (or `# ved custom` / `# ved custom end` in Dockerfile/shell) is a local customization — **always keep our side for those blocks**.
+
+**When still uncertain about what a local change is doing or why it exists**, consult the customizations tracking document in Basic Memory Cloud:
 - Project: `nanoclaw`
 - Permalink: `nanoclaw/nano-claw-custom-modifications-tracker`
 - Fetch it with: `mcp__basic-memory-cloud__read_note` (identifier: `nanoclaw/nano-claw-custom-modifications-tracker`, project: `nanoclaw`)
@@ -204,37 +212,29 @@ Show the PR URL to the user.
 
 ## 12. Regression check
 
-After opening the PR, **read each file listed below in full** — do not grep for keywords. Presence of a string is not sufficient; ordering, context, and completeness all matter.
+After opening the PR, verify all `ved custom` markers survived the merge:
 
-**`src/container-runner.ts`** — Read the entire `buildVolumeMounts` function and verify:
-- `homeDir` is declared and used
-- gh config mount block (`~/.config/gh` → `/home/node/.config/gh`) is present
-- Gmail mount block (`~/.gmail-mcp` → `/home/node/.gmail-mcp`) is present
-- Calendar mount block (`~/.calendar-mcp` → `/home/node/.calendar-mcp`) is present
-- `notifyJid?: string` is in the `ContainerInput` interface
-- `readSecrets()` includes `GITHUB_PERSONAL_ACCESS_TOKEN`, `FLARE_API_TOKEN`, `BASIC_MEMORY_API_KEY`
+```bash
+grep -rn "ved custom" src/ container/ --include="*.ts" --include="Dockerfile" --include="*.sh"
+```
 
-**`src/task-scheduler.ts`** — Verify:
-- `GROUPS_DIR` is in the import from `./config.js`
-- `notifyJid` is extracted from `containerConfig` and passed to `runContainerAgent`
+Each marker that existed before the sync must still be present. Count them: there should be **no fewer** than before. If any are missing, the block was dropped — restore it from the customizations tracker in Basic Memory Cloud (`nanoclaw/nano-claw-custom-modifications-tracker`).
 
-**`src/index.ts`** — Verify:
-- `WarmPool` is imported and used
-- `startFileSender` is imported and called
+For the Dockerfile specifically, also verify ordering: `git safe.directory` must appear **after** `USER node`.
 
-**`container/agent-runner/src/index.ts`** — Verify:
-- `notifyJid?: string` is in the `ContainerInput` interface
-- `mcp__gmail__*`, `mcp__calendar__*`, `mcp__flare__*`, `mcp__basic-memory-cloud__*` are in `allowedTools`
-- `gmail`, `calendar`, `flare`, `basic-memory-cloud` server blocks are all present in `mcpServers`
+```bash
+grep -n "USER node\|safe.directory" container/Dockerfile
+```
 
-**`container/Dockerfile`** — Read the full file and verify:
-- gh CLI install block is present
-- MCP servers (`@gongrzhe/server-gmail-autoauth-mcp`, `@cocal/google-calendar-mcp`, `mcp-remote`) are pre-installed
-- `git config --global --add safe.directory '*'` appears **after** `USER node`
-
-**`container/skills/`** — Verify `flare-monitor/` and `send-link/` directories are present.
+Also verify custom skills are intact:
+```bash
+ls container/skills/
+```
+`flare-monitor/` and `send-link/` must be present.
 
 If anything is missing or misplaced, fix it, commit to the sync branch, and push before requesting review.
+
+**When adding new customizations to upstream files in the future**, always wrap them with `/* ved custom */` ... `/* ved custom end */` (or `# ved custom` / `# ved custom end` in Dockerfile/shell), and update the customizations tracker.
 
 ## 13. Cleanup
 

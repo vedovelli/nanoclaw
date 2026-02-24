@@ -29,19 +29,23 @@ RUN apt-get update && apt-get install -y \
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
+# ved custom
 # Install GitHub CLI (gh)
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
     && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
+# ved custom end
 
 # Install agent-browser, claude-code, and MCP servers globally
 # Pre-installing MCP servers avoids ~20-30s npx download on every cold start
+# ved custom: gmail, calendar, mcp-remote added below
 RUN npm install -g agent-browser @anthropic-ai/claude-code \
     @gongrzhe/server-gmail-autoauth-mcp \
     @cocal/google-calendar-mcp \
     mcp-remote
+# ved custom end
 
 # Create app directory
 WORKDIR /app
@@ -72,10 +76,12 @@ RUN chown -R node:node /workspace && chmod 777 /home/node
 # Switch to non-root user (required for --dangerously-skip-permissions)
 USER node
 
+# ved custom
 # Configure git to trust host-mounted volumes (avoids "dubious ownership" errors
 # when the host directory is owned by a different UID than the container user)
 # Must run after USER node so it writes to /home/node/.gitconfig, not /root/.gitconfig
 RUN git config --global --add safe.directory '*'
+# ved custom end
 
 # Set working directory to group workspace
 WORKDIR /workspace/group

@@ -4,7 +4,7 @@ import fs from 'fs';
 
 import {
   ASSISTANT_NAME,
-  GROUPS_DIR,
+  /* ved custom */ GROUPS_DIR, /* ved custom end */
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   SCHEDULER_POLL_INTERVAL,
@@ -98,11 +98,13 @@ async function runTask(
     return;
   }
 
+  /* ved custom */
   // If the task's chat_jid is a virtual JID (e.g. system:background) with no
   // channel, look up its notifyJid so messages route to a real channel.
   const chatGroup = groups[task.chat_jid];
   const notifyJid = chatGroup?.containerConfig?.notifyJid;
   const deliveryJid = notifyJid || task.chat_jid;
+  /* ved custom end */
 
   // Update tasks snapshot for container to read (filtered by group)
   const isMain = task.group_folder === MAIN_GROUP_FOLDER;
@@ -153,7 +155,7 @@ async function runTask(
         chatJid: task.chat_jid,
         isMain,
         isScheduledTask: true,
-        notifyJid,
+        /* ved custom */ notifyJid, /* ved custom end */
         assistantName: ASSISTANT_NAME,
       },
       (proc, containerName) => deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),

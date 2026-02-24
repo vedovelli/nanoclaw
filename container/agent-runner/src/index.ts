@@ -26,7 +26,7 @@ interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
-  notifyJid?: string;
+  /* ved custom */ notifyJid?: string; /* ved custom end */
   assistantName?: string;
   secrets?: Record<string, string>;
 }
@@ -434,10 +434,12 @@ async function runQuery(
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
         'mcp__nanoclaw__*',
+        /* ved custom */
         'mcp__gmail__*',
         'mcp__calendar__*',
         'mcp__flare__*',
         'mcp__basic-memory-cloud__*'
+        /* ved custom end */
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -454,6 +456,7 @@ async function runQuery(
             NANOCLAW_NOTIFY_JID: containerInput.notifyJid || containerInput.chatJid,
           },
         },
+        /* ved custom */
         gmail: {
           command: 'npx',
           args: ['-y', '@gongrzhe/server-gmail-autoauth-mcp'],
@@ -476,6 +479,7 @@ async function runQuery(
           args: ['-y', 'mcp-remote', 'https://cloud.basicmemory.com/mcp',
                  '--header', `Authorization: Bearer ${sdkEnv.BASIC_MEMORY_API_KEY || ''}`],
         },
+        /* ved custom end */
       },
       hooks: {
         PreCompact: [{ hooks: [createPreCompactHook(containerInput.assistantName)] }],
