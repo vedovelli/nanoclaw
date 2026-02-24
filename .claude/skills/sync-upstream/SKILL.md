@@ -117,6 +117,13 @@ Parse the JSON output. The result has: `success`, `previousVersion`, `newVersion
 
 **If backupPending=true:** There are unresolved merge conflicts.
 
+**When uncertain about what a local change is doing or why it exists**, consult the customizations tracking document in Basic Memory Cloud before resolving:
+- Project: `nanoclaw`
+- Permalink: `nanoclaw/nano-claw-custom-modifications-tracker`
+- Fetch it with: `mcp__basic-memory-cloud__read_note` (identifier: `nanoclaw/nano-claw-custom-modifications-tracker`, project: `nanoclaw`)
+
+It lists every active customization, which files are affected, and re-apply difficulty. **Always keep our side** for any customization listed there.
+
 For each file in `mergeConflicts`:
 1. Read the file — it contains conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
 2. Check if there's an intent file for this path in any applied skill (e.g., `.claude/skills/<skill>/modify/<path>.intent.md`)
@@ -195,7 +202,21 @@ EOF
 
 Show the PR URL to the user.
 
-## 12. Cleanup
+## 12. Regression check
+
+After opening the PR, verify all customizations are still intact. For each item in the customizations tracker, confirm the relevant file contains the expected code.
+
+Key files to spot-check:
+- `src/container-runner.ts` — `notifyJid`, `homeDir`, extra secrets in `readSecrets()`
+- `src/task-scheduler.ts` — `notifyJid`, `GROUPS_DIR`
+- `src/index.ts` — `WarmPool`, `startFileSender`
+- `container/agent-runner/src/index.ts` — `notifyJid`, all MCP servers (gmail, calendar, flare, basic-memory-cloud), tool permissions
+- `container/Dockerfile` — gh CLI install, MCP servers pre-installed, `git safe.directory`
+- `container/skills/` — all custom skills still present
+
+If anything is missing, fix it, commit to the sync branch, and push before requesting review.
+
+## 13. Cleanup
 
 ```bash
 rm -rf <TEMP_DIR>
