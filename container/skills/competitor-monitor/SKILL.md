@@ -52,22 +52,30 @@ Also read `Concorrência/Monitoramento Diário - Perguntas de Análise` to under
 
 Store the content of both snapshots in memory for comparison in step 5.
 
+Also check whether `Concorrência/Faros AI/$TODAY` already exists in Basic Memory.
+If it does, today's run already completed successfully. Exit silently:
+```
+<internal>Already ran today.</internal>
+```
+
+Additionally, always read `Concorrência/Faros AI - Análise Competitiva` and `Concorrência/Jellyfish - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for both competitors. Store these for use in step 7 when applying the `high-threat` CSS class.
+
 ### 3. Research Faros AI
 
 **a) GitHub releases (faros-community-edition):**
 
 ```bash
 gh api repos/faros-ai/faros-community-edition/releases \
-  --jq '[.[] | {tag: .tag_name, published: .published_at, body: .body}]' \
-  --limit 5
+  -f per_page=5 \
+  --jq '[.[] | {tag: .tag_name, published: .published_at, body: .body}]'
 ```
 
 **b) GitHub releases (airbyte-connectors):**
 
 ```bash
 gh api repos/faros-ai/airbyte-connectors/releases \
-  --jq '[.[] | {tag: .tag_name, published: .published_at, body: .body}]' \
-  --limit 5
+  -f per_page=5 \
+  --jq '[.[] | {tag: .tag_name, published: .published_at, body: .body}]'
 ```
 
 **c) Recently merged PRs (last 48h — cast wider net to avoid missing daily gaps):**
@@ -88,6 +96,8 @@ Use `agent-browser` to fetch `https://faros.ai/blog`. Extract post titles, dates
 
 Use `agent-browser` to fetch `https://faros.ai/clara`. Note any visible changes, new features, or new copy compared to what was in yesterday's snapshot.
 
+If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Faros AI as having no changes for today.
+
 ### 4. Research Jellyfish
 
 Jellyfish is closed source — no GitHub to query. Use browser only.
@@ -103,6 +113,8 @@ Use `agent-browser` to fetch `https://jellyfish.co/platform/jellyfish-ai-impact/
 **c) Homepage/announcements:**
 
 Use `agent-browser` to check `https://jellyfish.co` for any banners or featured announcements.
+
+If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Jellyfish as having no changes for today.
 
 ### 5. Compare with yesterday
 
@@ -125,6 +137,8 @@ If both `FAROS_CHANGES` and `JELLYFISH_CHANGES` are empty → exit:
 ```
 <internal>Nothing to do this run.</internal>
 ```
+
+**Critical:** The `<` must be the very first character of your entire output. Do NOT write any summary, reasoning, or explanation before the `<internal>` tag.
 
 ### 7. Generate HTML report
 
@@ -198,6 +212,11 @@ Use `mcp__gmail__*` to send:
 - **Body:** Plain text summary of the key changes (2–4 lines)
 - **Attachment:** `/tmp/competitor-report-$TODAY.pdf`
 
+If the Gmail send fails for any reason, do not retry and do not notify. Exit silently — skip step 10:
+```
+<internal>Gmail send failed.</internal>
+```
+
 ### 10. Save today's snapshots to Basic Memory
 
 Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product"` for each competitor:
@@ -208,12 +227,3 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 **Title:** `Concorrência/Jellyfish/$TODAY`
 **Content:** Same structure for Jellyfish.
 
-### 11. If nothing was done
-
-If no changes were detected, your entire output must be exactly:
-
-```
-<internal>Nothing to do this run.</internal>
-```
-
-**Critical:** The `<` must be the very first character. No text before or after the tags.
