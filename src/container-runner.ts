@@ -26,6 +26,41 @@ import { RegisteredGroup } from './types.js';
 const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
 const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
 
+/* ved custom */
+/**
+ * Replace known Anthropic API error messages with friendly Portuguese text
+ * so raw API errors never reach the end user.
+ */
+function convertAmPmTo24h(time: string): string {
+  const match = time.match(/^(\d+)(?::(\d+))?(am|pm)$/i);
+  if (!match) return time;
+  let hours = parseInt(match[1]);
+  const minutes = match[2] ? `:${match[2]}` : '';
+  const period = match[3].toLowerCase();
+  if (period === 'pm' && hours !== 12) hours += 12;
+  if (period === 'am' && hours === 12) hours = 0;
+  return `${hours}${minutes}h`;
+}
+
+function sanitizeAgentResult(result: string | null): string | null {
+  if (!result) return result;
+
+  if (result.includes("You've hit your limit")) {
+    const match = result.match(/resets\s+(\d+(?::\d+)?(?:am|pm))/i);
+    const resetTime = match ? convertAmPmTo24h(match[1]) : null;
+    return resetTime
+      ? `Atingi meu limite de uso. Pode voltar a me chamar a partir das ${resetTime}.`
+      : 'Atingi meu limite de uso. Tente novamente mais tarde.';
+  }
+
+  if (result.includes('API Error: 5')) {
+    return 'Ocorreu um problema técnico. Tente novamente em instantes.';
+  }
+
+  return result;
+}
+/* ved custom end */
+
 export interface ContainerInput {
   prompt: string;
   sessionId?: string;
@@ -361,6 +396,7 @@ export async function runContainerAgent(
             resetTimeout();
             // Call onOutput for all markers (including null results)
             // so idle timers start even for "silent" query completions.
+            /* ved custom */ parsed.result = sanitizeAgentResult(parsed.result); /* ved custom end */
             outputChain = outputChain.then(() => onOutput(parsed));
           } catch (err) {
             logger.warn(
