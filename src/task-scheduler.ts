@@ -1,11 +1,10 @@
 import { ChildProcess } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import fs from 'fs';
-import path from 'path';
 
 import {
   ASSISTANT_NAME,
-  GROUPS_DIR,
+  /* ved custom */ GROUPS_DIR, /* ved custom end */
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   SCHEDULER_POLL_INTERVAL,
@@ -99,11 +98,13 @@ async function runTask(
     return;
   }
 
+  /* ved custom */
   // If the task's chat_jid is a virtual JID (e.g. system:background) with no
   // channel, look up its notifyJid so messages route to a real channel.
   const chatGroup = groups[task.chat_jid];
   const notifyJid = chatGroup?.containerConfig?.notifyJid;
   const deliveryJid = notifyJid || task.chat_jid;
+  /* ved custom end */
 
   // Update tasks snapshot for container to read (filtered by group)
   const isMain = task.group_folder === MAIN_GROUP_FOLDER;
@@ -154,7 +155,7 @@ async function runTask(
         chatJid: task.chat_jid,
         isMain,
         isScheduledTask: true,
-        notifyJid,
+        /* ved custom */ notifyJid, /* ved custom end */
         assistantName: ASSISTANT_NAME,
       },
       (proc, containerName) => deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
@@ -263,35 +264,6 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
   };
 
   loop();
-}
-
-/**
- * Delete container log files older than the given number of days.
- * Runs once on startup and then every 24 hours.
- */
-export function startLogCleanup(maxAgeDays = 7): void {
-  const clean = () => {
-    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
-    try {
-      for (const group of fs.readdirSync(GROUPS_DIR)) {
-        const logsDir = path.join(GROUPS_DIR, group, 'logs');
-        if (!fs.existsSync(logsDir)) continue;
-        for (const file of fs.readdirSync(logsDir)) {
-          if (!file.startsWith('container-')) continue;
-          const filePath = path.join(logsDir, file);
-          const { mtimeMs } = fs.statSync(filePath);
-          if (mtimeMs < cutoff) {
-            fs.unlinkSync(filePath);
-          }
-        }
-      }
-    } catch (err) {
-      logger.warn({ err }, 'Log cleanup error');
-    }
-    setTimeout(clean, 24 * 60 * 60 * 1000);
-  };
-
-  clean();
 }
 
 /** @internal - for tests only. */

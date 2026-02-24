@@ -33,7 +33,7 @@ export interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
-  notifyJid?: string;
+  /* ved custom */ notifyJid?: string; /* ved custom end */
   assistantName?: string;
   secrets?: Record<string, string>;
 }
@@ -57,7 +57,7 @@ function buildVolumeMounts(
 ): VolumeMount[] {
   const mounts: VolumeMount[] = [];
   const projectRoot = process.cwd();
-  const homeDir = process.env.HOME || '/home/user';
+  /* ved custom */ const homeDir = process.env.HOME || '/home/user'; /* ved custom end */
   const groupDir = resolveGroupFolderPath(group.folder);
 
   if (isMain) {
@@ -121,28 +121,7 @@ function buildVolumeMounts(
         // https://code.claude.com/docs/en/memory#manage-auto-memory
         CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
       },
-      mcpServers: {
-        github: {
-          command: 'npx',
-          args: ['-y', '@modelcontextprotocol/server-github'],
-        },
-      },
     }, null, 2) + '\n');
-  } else {
-    // Patch existing settings to add mcpServers if missing
-    try {
-      const existing = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-      if (!existing.mcpServers?.github) {
-        existing.mcpServers = {
-          ...existing.mcpServers,
-          github: {
-            command: 'npx',
-            args: ['-y', '@modelcontextprotocol/server-github'],
-          },
-        };
-        fs.writeFileSync(settingsFile, JSON.stringify(existing, null, 2) + '\n');
-      }
-    } catch { /* leave as-is if parse fails */ }
   }
 
   // Sync skills from container/skills/ into each group's .claude/skills/
@@ -162,6 +141,7 @@ function buildVolumeMounts(
     readonly: false,
   });
 
+  /* ved custom */
   // GitHub CLI config (for gh auth and git credential helper)
   const ghConfigDir = path.join(homeDir, '.config', 'gh');
   if (fs.existsSync(ghConfigDir)) {
@@ -191,6 +171,7 @@ function buildVolumeMounts(
       readonly: false,
     });
   }
+  /* ved custom end */
 
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
@@ -237,7 +218,7 @@ function buildVolumeMounts(
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'FLARE_API_TOKEN', 'BASIC_MEMORY_API_KEY']);
+  /* ved custom */ return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'FLARE_API_TOKEN', 'BASIC_MEMORY_API_KEY']); /* ved custom end */
 }
 
 function buildContainerArgs(mounts: VolumeMount[], containerName: string): string[] {
