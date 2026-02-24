@@ -43,10 +43,6 @@ RUN npm install -g agent-browser @anthropic-ai/claude-code \
     @cocal/google-calendar-mcp \
     mcp-remote
 
-# Configure git to trust host-mounted volumes (avoids "dubious ownership" errors
-# when the host directory is owned by a different UID than the container user)
-RUN git config --global --add safe.directory '*'
-
 # Create app directory
 WORKDIR /app
 
@@ -75,6 +71,11 @@ RUN chown -R node:node /workspace && chmod 777 /home/node
 
 # Switch to non-root user (required for --dangerously-skip-permissions)
 USER node
+
+# Configure git to trust host-mounted volumes (avoids "dubious ownership" errors
+# when the host directory is owned by a different UID than the container user)
+# Must run after USER node so it writes to /home/node/.gitconfig, not /root/.gitconfig
+RUN git config --global --add safe.directory '*'
 
 # Set working directory to group workspace
 WORKDIR /workspace/group
