@@ -88,3 +88,13 @@ If the customization is substantial — adding a new MCP server, a new container
 > "This change is significant enough to become its own `ved-` skill. Want me to create `.claude/skills/ved-<name>/SKILL.md` so it's documented, repeatable, and shows up in `/help`?"
 
 If yes, create the skill file before committing.
+
+## Step 8: Update ved-sync-upstream regression check if needed
+
+Read Step 12 of `.claude/skills/ved-sync-upstream/SKILL.md` and check whether the new customization introduces anything the regression check wouldn't catch in a future sync:
+
+- **New custom skill in `container/skills/`** — add it to the `ls container/skills/` check (e.g. `myskill/` must be present)
+- **New ordering constraint in the Dockerfile** — add a `grep -n` check for the relevant lines
+- **New file that must always exist** — add an existence check
+
+If the regression check already covers the new customization via the `grep -rn "ved custom"` marker count, no update is needed. Only update when the new customization can't be caught by marker presence alone.
