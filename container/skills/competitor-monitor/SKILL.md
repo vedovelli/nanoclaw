@@ -237,7 +237,7 @@ Read the content of `/tmp/competitor-report-$TODAY.html` and send it as the emai
 
 ### 9. Update Timeline in Basic Memory
 
-After the email is sent, update the persistent timeline document in `dev-visibility-product`.
+Regardless of whether the email succeeded, update the persistent timeline document in `dev-visibility-product`.
 
 **a)** Check if `Concorrência/Timeline de Melhorias` exists using `mcp__basic-memory-cloud__read_note`.
 
@@ -331,7 +331,7 @@ For each item marked `[DEV_VISIBILITY_CANDIDATE]` in steps 3 and 4:
 gh issue list \
   --repo vedovelli/dev-visibility-application \
   --search "[Competitor name] [feature keywords]" \
-  --state open \
+  --state all \
   --json number,title \
   --limit 5
 ```
@@ -339,6 +339,8 @@ gh issue list \
 If a similar issue already exists (same competitor + same feature topic), skip creation for this item.
 
 **b)** Create the issue:
+
+> **Prerequisite:** The `competitive-intel` label must exist in `vedovelli/dev-visibility-application` before the first run. Create it once with: `gh label create "competitive-intel" --repo vedovelli/dev-visibility-application --color "0075ca"`
 
 ```bash
 gh issue create \
