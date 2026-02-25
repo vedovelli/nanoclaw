@@ -233,6 +233,8 @@ ls container/skills/
 ```
 `flare-monitor/`, `send-link/` and `competitor-monitor/` must be present.
 
+Also verify the X integration IPC handler is intact in `src/ipc.ts` (the `spawn` import and the `x_*` handler block in the `default` case) and the X MCP tools block is intact in `container/agent-runner/src/ipc-mcp-stdio.ts`. These are caught by the marker count check — the opening marker count should be **at least 12**.
+
 If anything is missing or misplaced, fix it, commit to the sync branch, and push before requesting review.
 
 **When adding new customizations to upstream files in the future**, always wrap them with `/* ved custom */` ... `/* ved custom end */` (or `# ved custom` / `# ved custom end` in Dockerfile/shell), and update the customizations tracker.
