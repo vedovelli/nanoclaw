@@ -253,9 +253,7 @@ function buildVolumeMounts(
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  /* ved custom */
-  // Added ANTHROPIC_API_URL, ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN for alternative providers (e.g., Max Mini, OpenRouter, etc.)
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_API_URL', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'FLARE_API_TOKEN', 'BASIC_MEMORY_API_KEY']); /* ved custom end */
+  /* ved custom */ return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'FLARE_API_TOKEN', 'BASIC_MEMORY_API_KEY']); /* ved custom end */
 }
 
 function buildContainerArgs(mounts: VolumeMount[], containerName: string): string[] {
