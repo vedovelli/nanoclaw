@@ -59,7 +59,7 @@ let messageLoopRunning = false;
 let whatsapp: WhatsAppChannel;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
-const warmPool = WARM_POOL_ENABLED ? new WarmPool(queue) : null;
+/* ved custom */ const warmPool = WARM_POOL_ENABLED ? new WarmPool(queue) : null; /* ved custom end */
 
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
@@ -105,11 +105,14 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
     { jid, name: group.name, folder: group.folder },
     'Group registered',
   );
+  /* ved custom */
   warmPool?.prewarm(jid, group, sessions[group.folder]).catch((err) =>
     logger.warn({ jid, err }, 'Failed to prewarm container'),
   );
+  /* ved custom end */
 }
 
+/* ved custom */
 /**
  * Output handler factory for warm-pool claimed containers.
  * Mirrors processGroupMessages: strips <internal> tags, sends to channel, tracks session, resets idle.
@@ -168,6 +171,7 @@ function makeWarmOutputHandler(
     }
   };
 }
+/* ved custom end */
 
 /**
  * Get available groups list for the agent.
@@ -348,7 +352,7 @@ async function runAgent(
         if (output.newSessionId) {
           sessions[group.folder] = output.newSessionId;
           setSession(group.folder, output.newSessionId);
-          warmPool?.updateSession(group.folder, output.newSessionId);
+          /* ved custom */ warmPool?.updateSession(group.folder, output.newSessionId); /* ved custom end */
         }
         await onOutput(output);
       }
@@ -373,7 +377,7 @@ async function runAgent(
     if (output.newSessionId) {
       sessions[group.folder] = output.newSessionId;
       setSession(group.folder, output.newSessionId);
-      warmPool?.updateSession(group.folder, output.newSessionId);
+      /* ved custom */ warmPool?.updateSession(group.folder, output.newSessionId); /* ved custom end */
     }
 
     if (output.status === 'error') {
@@ -475,6 +479,7 @@ async function startMessageLoop(): Promise<void> {
               ?.catch((err) =>
                 logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
               );
+          /* ved custom */
           } else if (warmPool?.claim(chatJid, formatted, makeWarmOutputHandler(chatJid, group, channel, lastAgentTimestamp[chatJid] || ''))) {
             logger.info(
               { chatJid, count: messagesToSend.length },
@@ -493,6 +498,7 @@ async function startMessageLoop(): Promise<void> {
             // over-allocating beyond MAX_CONCURRENT_CONTAINERS. The message
             // loop will retry on the next poll cycle once the container is ready.
             logger.debug({ chatJid }, 'Warm container booting, deferring cold start');
+          /* ved custom end */
           } else {
             // No active or warm container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);
@@ -536,6 +542,7 @@ async function main(): Promise<void> {
   loadState();
 
   // Prewarm containers for all registered groups
+  /* ved custom */
   if (warmPool) {
     for (const [jid, group] of Object.entries(registeredGroups)) {
       warmPool.prewarm(jid, group, sessions[group.folder]).catch((err) =>
@@ -543,6 +550,7 @@ async function main(): Promise<void> {
       );
     }
   }
+  /* ved custom end */
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
