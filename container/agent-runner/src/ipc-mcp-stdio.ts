@@ -283,6 +283,123 @@ Use available_groups.json to find the JID for a group. The folder name should be
   },
 );
 
+/* ved custom */
+// X integration tools - browser automation via host IPC
+const X_RESULTS_DIR = path.join(IPC_DIR, 'x_results');
+
+async function waitForXResult(requestId: string, maxWait = 60000): Promise<{ success: boolean; message: string }> {
+  const resultFile = path.join(X_RESULTS_DIR, `${requestId}.json`);
+  const pollInterval = 1000;
+  let elapsed = 0;
+  while (elapsed < maxWait) {
+    if (fs.existsSync(resultFile)) {
+      try {
+        const result = JSON.parse(fs.readFileSync(resultFile, 'utf-8'));
+        fs.unlinkSync(resultFile);
+        return result;
+      } catch (err) {
+        return { success: false, message: `Failed to read result: ${err}` };
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    elapsed += pollInterval;
+  }
+  return { success: false, message: 'X request timed out' };
+}
+
+server.tool(
+  'x_post',
+  `Post a tweet to X (Twitter). Main group only.
+
+The host machine will execute the browser automation to post the tweet.
+Make sure the content is appropriate and within X's character limit (280 chars for text).`,
+  { content: z.string().max(280).describe('The tweet content to post (max 280 characters)') },
+  async (args) => {
+    if (!isMain) {
+      return { content: [{ type: 'text' as const, text: 'Only the main group can post tweets.' }], isError: true };
+    }
+    const requestId = `xpost-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, { type: 'x_post', requestId, content: args.content, groupFolder, timestamp: new Date().toISOString() });
+    const result = await waitForXResult(requestId);
+    return { content: [{ type: 'text' as const, text: result.message }], isError: !result.success };
+  },
+);
+
+server.tool(
+  'x_like',
+  `Like a tweet on X (Twitter). Main group only.
+
+Provide the tweet URL or tweet ID to like.`,
+  { tweet_url: z.string().describe('The tweet URL (e.g., https://x.com/user/status/123) or tweet ID') },
+  async (args) => {
+    if (!isMain) {
+      return { content: [{ type: 'text' as const, text: 'Only the main group can interact with X.' }], isError: true };
+    }
+    const requestId = `xlike-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, { type: 'x_like', requestId, tweetUrl: args.tweet_url, groupFolder, timestamp: new Date().toISOString() });
+    const result = await waitForXResult(requestId);
+    return { content: [{ type: 'text' as const, text: result.message }], isError: !result.success };
+  },
+);
+
+server.tool(
+  'x_reply',
+  `Reply to a tweet on X (Twitter). Main group only.
+
+Provide the tweet URL and your reply content.`,
+  {
+    tweet_url: z.string().describe('The tweet URL (e.g., https://x.com/user/status/123) or tweet ID'),
+    content: z.string().max(280).describe('The reply content (max 280 characters)'),
+  },
+  async (args) => {
+    if (!isMain) {
+      return { content: [{ type: 'text' as const, text: 'Only the main group can interact with X.' }], isError: true };
+    }
+    const requestId = `xreply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, { type: 'x_reply', requestId, tweetUrl: args.tweet_url, content: args.content, groupFolder, timestamp: new Date().toISOString() });
+    const result = await waitForXResult(requestId);
+    return { content: [{ type: 'text' as const, text: result.message }], isError: !result.success };
+  },
+);
+
+server.tool(
+  'x_retweet',
+  `Retweet a tweet on X (Twitter). Main group only.
+
+Provide the tweet URL to retweet.`,
+  { tweet_url: z.string().describe('The tweet URL (e.g., https://x.com/user/status/123) or tweet ID') },
+  async (args) => {
+    if (!isMain) {
+      return { content: [{ type: 'text' as const, text: 'Only the main group can interact with X.' }], isError: true };
+    }
+    const requestId = `xretweet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, { type: 'x_retweet', requestId, tweetUrl: args.tweet_url, groupFolder, timestamp: new Date().toISOString() });
+    const result = await waitForXResult(requestId);
+    return { content: [{ type: 'text' as const, text: result.message }], isError: !result.success };
+  },
+);
+
+server.tool(
+  'x_quote',
+  `Quote tweet on X (Twitter). Main group only.
+
+Retweet with your own comment added.`,
+  {
+    tweet_url: z.string().describe('The tweet URL (e.g., https://x.com/user/status/123) or tweet ID'),
+    comment: z.string().max(280).describe('Your comment for the quote tweet (max 280 characters)'),
+  },
+  async (args) => {
+    if (!isMain) {
+      return { content: [{ type: 'text' as const, text: 'Only the main group can interact with X.' }], isError: true };
+    }
+    const requestId = `xquote-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, { type: 'x_quote', requestId, tweetUrl: args.tweet_url, comment: args.comment, groupFolder, timestamp: new Date().toISOString() });
+    const result = await waitForXResult(requestId);
+    return { content: [{ type: 'text' as const, text: result.message }], isError: !result.success };
+  },
+);
+/* ved custom end */
+
 // Register PDF generation and file sending tools
 registerPdfTools(server, chatJid, groupFolder);
 
