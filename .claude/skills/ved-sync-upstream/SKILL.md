@@ -254,21 +254,45 @@ Report final status:
 
 ## 14. Session report
 
-After the sync is complete (PR merged, service restarted, verified working), write a session report to Basic Memory Cloud:
+**Write this note immediately after cleanup** — do not wait for the PR to be merged.
+
+Use `mcp__basic-memory-cloud__write_note` to write the report:
 
 - Project: `nanoclaw`
 - Directory: `reports`
 - Title: `Upstream Sync v<NEW_VERSION> — Session Report (YYYY-MM-DD)`
 - Tags: `upstream-sync`, `v<NEW_VERSION>`, `session-report`
-- Tool: `mcp__basic-memory-cloud__write_note`
 
-The report should cover:
-- **What changed upstream** — key changes from the new version
-- **Merge conflicts** — which files conflicted and how they were resolved
-- **Regressions found** — any issues caught during regression check, how they were fixed, and how they were discovered
-- **New customizations added** — any new `ved custom` blocks or skills created during this session
-- **Infrastructure changes** — Node version, plist, container rebuild, etc.
-- **Lessons learned** — anything that should inform future syncs
+The report **must** cover all of the following sections:
+
+### What's new in v<NEW_VERSION> (upstream changes)
+
+For every commit between the previous version and the new version, document what actually changed functionally. Check `git log` on the upstream remote and inspect the key file diffs. Describe:
+- New features added upstream
+- Bug fixes
+- Refactors that affect runtime behavior
+- Infrastructure/tooling changes (CI, `.nvmrc`, etc.)
+- New or updated skills bundled with upstream
+
+### Conflicts resolved
+
+A table listing every conflicted file, what we kept from our side, and what we adopted from upstream.
+
+### Regressions found
+
+Any issues caught during the regression check (step 12), how they were fixed, and how they were discovered. If none, say so explicitly.
+
+### New customizations added
+
+Any new `ved custom` blocks or skills created during this session.
+
+### Infrastructure changes
+
+Node version changes, plist updates, container rebuild notes, etc.
+
+### Lessons learned
+
+Anything that should inform future syncs — tricky conflict patterns, pre-existing test failures, ordering issues, etc.
 
 ## Troubleshooting
 
