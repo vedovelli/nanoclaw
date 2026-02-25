@@ -113,7 +113,32 @@ This clears the backup, confirming the resolution.
 
 **If you cannot confidently resolve a conflict:** Show the user the conflicting sections and ask them to choose or provide guidance.
 
-## 7. Run migrations
+## 7. Sync agent-runner session copies
+
+`container/agent-runner/src/` may have changed in this update. Each group has a live copy at `data/sessions/{group}/agent-runner-src/` that is mounted into containers at runtime. These copies are created once and never automatically updated — sync them now:
+
+```bash
+for dir in data/sessions/*/agent-runner-src; do cp -r container/agent-runner/src/. "$dir/"; done
+```
+
+Then run the full deploy sequence:
+
+```bash
+npm run build && ./container/build.sh
+```
+
+And restart the service:
+
+```bash
+# macOS:
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+# Linux:
+systemctl --user restart nanoclaw
+```
+
+Report to the user: "Agent-runner session copies synced and services restarted."
+
+## 9. Run migrations
 
 Run migrations between the old and new versions:
 
@@ -127,7 +152,7 @@ Parse the JSON output. It contains: `migrationsRun` (count), `results` (array of
 
 **If no migrations found:** This is normal (most updates won't have migrations). Continue silently.
 
-## 8. Verify
+## 10. Verify
 
 Run build and tests:
 
@@ -143,7 +168,7 @@ npm run build && npm test
 
 **If both pass:** Report success.
 
-## 9. Cleanup
+## 11. Cleanup
 
 Remove the temp directory:
 

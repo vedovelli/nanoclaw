@@ -77,6 +77,31 @@ systemctl --user stop nanoclaw
 systemctl --user restart nanoclaw
 ```
 
+## Deploying changes to `container/agent-runner/src/`
+
+Each group has a live copy of the agent-runner source at `data/sessions/{group}/agent-runner-src/` that is mounted into the container at runtime. This copy is created **once** on first run and is never overwritten automatically — so changes to `container/agent-runner/src/` do **not** reach existing groups until you sync manually.
+
+After merging any PR or making any change that touches `container/agent-runner/src/`, run the full deploy sequence:
+
+```bash
+# 1. Sync session copies with the updated canonical source
+for dir in data/sessions/*/agent-runner-src; do cp -r container/agent-runner/src/. "$dir/"; done
+
+# 2. Compile host TypeScript
+npm run build
+
+# 3. Rebuild the agent container image
+./container/build.sh
+
+# 4. Restart the service
+# macOS:
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+# Linux:
+systemctl --user restart nanoclaw
+```
+
+Skip step 1 if your changes are only in `src/` (host code). Skip steps 2–3 if your changes are only in `container/agent-runner/src/` (container code). Always run step 4.
+
 ## Container Build Cache
 
 The container buildkit caches the build context aggressively. `--no-cache` alone does NOT invalidate COPY steps — the builder's volume retains stale files. To force a truly clean rebuild, prune the builder then re-run `./container/build.sh`.
