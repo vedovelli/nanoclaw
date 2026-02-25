@@ -413,7 +413,8 @@ export async function processTaskIpc(
               if (xData.comment) scriptArgs.comment = xData.comment;
 
               const scriptPath = `${process.cwd()}/.claude/skills/x-integration/scripts/${scriptName}.ts`;
-              const proc = spawn('npx', ['tsx', scriptPath], {
+              const tsxBin = path.resolve(process.cwd(), 'node_modules/.bin/tsx');
+              const proc = spawn(process.execPath, [tsxBin, scriptPath], {
                 cwd: process.cwd(),
                 env: { ...process.env, NANOCLAW_ROOT: process.cwd() },
                 stdio: ['pipe', 'pipe', 'pipe'],
