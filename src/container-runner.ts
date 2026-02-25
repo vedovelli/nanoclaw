@@ -96,7 +96,8 @@ function buildVolumeMounts(
 ): VolumeMount[] {
   const mounts: VolumeMount[] = [];
   const projectRoot = process.cwd();
-  /* ved custom */ const homeDir = process.env.HOME || '/home/user'; /* ved custom end */
+  /* ved custom */ const homeDir =
+    process.env.HOME || '/home/user'; /* ved custom end */
   const groupDir = resolveGroupFolderPath(group.folder);
 
   if (isMain) {
@@ -274,7 +275,13 @@ function buildVolumeMounts(
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  /* ved custom */ return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'FLARE_API_TOKEN', 'BASIC_MEMORY_API_KEY']); /* ved custom end */
+  /* ved custom */ return readEnvFile([
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'ANTHROPIC_API_KEY',
+    'GITHUB_PERSONAL_ACCESS_TOKEN',
+    'FLARE_API_TOKEN',
+    'BASIC_MEMORY_API_KEY',
+  ]); /* ved custom end */
 }
 
 function buildContainerArgs(
@@ -420,7 +427,9 @@ export async function runContainerAgent(
             resetTimeout();
             // Call onOutput for all markers (including null results)
             // so idle timers start even for "silent" query completions.
-            /* ved custom */ parsed.result = sanitizeAgentResult(parsed.result); /* ved custom end */
+            /* ved custom */ parsed.result = sanitizeAgentResult(
+              parsed.result,
+            ); /* ved custom end */
             outputChain = outputChain.then(() => onOutput(parsed));
           } catch (err) {
             logger.warn(

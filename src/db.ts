@@ -448,7 +448,10 @@ export function getDueTasks(): ScheduledTask[] {
  * while it is still running (which would queue a back-to-back run).
  */
 export function updateTaskNextRun(id: string, nextRun: string | null): void {
-  db.prepare(`UPDATE scheduled_tasks SET next_run = ? WHERE id = ?`).run(nextRun, id);
+  db.prepare(`UPDATE scheduled_tasks SET next_run = ? WHERE id = ?`).run(
+    nextRun,
+    id,
+  );
 }
 
 export function updateTaskAfterRun(

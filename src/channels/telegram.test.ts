@@ -19,7 +19,8 @@ vi.mock('../logger.js', () => ({
 }));
 
 // Mock transcription
-const mockTranscribeAudioBuffer = vi.fn<(buffer: Buffer) => Promise<string | null>>();
+const mockTranscribeAudioBuffer =
+  vi.fn<(buffer: Buffer) => Promise<string | null>>();
 vi.mock('../transcription.js', () => ({
   transcribeAudioBuffer: (buffer: Buffer) => mockTranscribeAudioBuffer(buffer),
 }));
@@ -585,9 +586,9 @@ describe('TelegramChannel', () => {
       mockTranscribeAudioBuffer.mockResolvedValueOnce('Hello from voice');
 
       // Mock fetch for voice download
-      const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(Buffer.from('fake-ogg-data')),
-      );
+      const mockFetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(Buffer.from('fake-ogg-data')));
 
       const ctx = createMediaCtx({
         extra: { voice: { file_id: 'voice_file_123', duration: 5 } },
@@ -611,9 +612,9 @@ describe('TelegramChannel', () => {
 
       mockTranscribeAudioBuffer.mockResolvedValueOnce(null);
 
-      const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(Buffer.from('fake-ogg-data')),
-      );
+      const mockFetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(Buffer.from('fake-ogg-data')));
 
       const ctx = createMediaCtx({
         extra: { voice: { file_id: 'voice_file_456', duration: 3 } },
@@ -633,9 +634,9 @@ describe('TelegramChannel', () => {
       const channel = new TelegramChannel('test-token', opts);
       await channel.connect();
 
-      const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response('Not Found', { status: 404 }),
-      );
+      const mockFetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
 
       const ctx = createMediaCtx({
         extra: { voice: { file_id: 'voice_404', duration: 2 } },
@@ -749,7 +750,9 @@ describe('TelegramChannel', () => {
       const channel = new TelegramChannel('test-token', opts);
       await channel.connect();
 
-      const ctx = createMediaCtx({ extra: { location: { latitude: -23.5505, longitude: -46.6333 } } });
+      const ctx = createMediaCtx({
+        extra: { location: { latitude: -23.5505, longitude: -46.6333 } },
+      });
       await triggerMediaMessage('message:location', ctx);
 
       expect(opts.onMessage).toHaveBeenCalledWith(

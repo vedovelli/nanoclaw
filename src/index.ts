@@ -13,7 +13,10 @@ import {
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
 import { TelegramChannel } from './channels/telegram.js';
-import { cleanupOrphans, ensureContainerRuntimeRunning } from './container-runtime.js';
+import {
+  cleanupOrphans,
+  ensureContainerRuntimeRunning,
+} from './container-runtime.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -59,7 +62,9 @@ let messageLoopRunning = false;
 let whatsapp: WhatsAppChannel;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
-/* ved custom */ const warmPool = WARM_POOL_ENABLED ? new WarmPool(queue) : null; /* ved custom end */
+/* ved custom */ const warmPool = WARM_POOL_ENABLED
+  ? new WarmPool(queue)
+  : null; /* ved custom end */
 
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
@@ -106,9 +111,9 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
     'Group registered',
   );
   /* ved custom */
-  warmPool?.prewarm(jid, group, sessions[group.folder]).catch((err) =>
-    logger.warn({ jid, err }, 'Failed to prewarm container'),
-  );
+  warmPool
+    ?.prewarm(jid, group, sessions[group.folder])
+    .catch((err) => logger.warn({ jid, err }, 'Failed to prewarm container'));
   /* ved custom end */
 }
 
@@ -129,7 +134,10 @@ function makeWarmOutputHandler(
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      logger.debug({ group: group.name }, 'Idle timeout, closing container stdin');
+      logger.debug(
+        { group: group.name },
+        'Idle timeout, closing container stdin',
+      );
       queue.closeStdin(chatJid);
     }, IDLE_TIMEOUT);
   };
@@ -142,7 +150,10 @@ function makeWarmOutputHandler(
     }
 
     if (output.result) {
-      const raw = typeof output.result === 'string' ? output.result : JSON.stringify(output.result);
+      const raw =
+        typeof output.result === 'string'
+          ? output.result
+          : JSON.stringify(output.result);
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
@@ -162,9 +173,15 @@ function makeWarmOutputHandler(
       if (!outputSentToUser) {
         lastAgentTimestamp[chatJid] = previousCursor;
         saveState();
-        logger.warn({ chatJid }, 'Warm container error, rolled back message cursor for retry');
+        logger.warn(
+          { chatJid },
+          'Warm container error, rolled back message cursor for retry',
+        );
       } else {
-        logger.warn({ chatJid }, 'Warm container error after output was sent, skipping cursor rollback');
+        logger.warn(
+          { chatJid },
+          'Warm container error after output was sent, skipping cursor rollback',
+        );
       }
       await channel.setTyping?.(chatJid, false);
       if (idleTimer) clearTimeout(idleTimer);
@@ -352,7 +369,10 @@ async function runAgent(
         if (output.newSessionId) {
           sessions[group.folder] = output.newSessionId;
           setSession(group.folder, output.newSessionId);
-          /* ved custom */ warmPool?.updateSession(group.folder, output.newSessionId); /* ved custom end */
+          /* ved custom */ warmPool?.updateSession(
+            group.folder,
+            output.newSessionId,
+          ); /* ved custom end */
         }
         await onOutput(output);
       }
@@ -377,7 +397,10 @@ async function runAgent(
     if (output.newSessionId) {
       sessions[group.folder] = output.newSessionId;
       setSession(group.folder, output.newSessionId);
-      /* ved custom */ warmPool?.updateSession(group.folder, output.newSessionId); /* ved custom end */
+      /* ved custom */ warmPool?.updateSession(
+        group.folder,
+        output.newSessionId,
+      ); /* ved custom end */
     }
 
     if (output.status === 'error') {
@@ -479,8 +502,19 @@ async function startMessageLoop(): Promise<void> {
               ?.catch((err) =>
                 logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
               );
-          /* ved custom */
-          } else if (warmPool?.claim(chatJid, formatted, makeWarmOutputHandler(chatJid, group, channel, lastAgentTimestamp[chatJid] || ''))) {
+            /* ved custom */
+          } else if (
+            warmPool?.claim(
+              chatJid,
+              formatted,
+              makeWarmOutputHandler(
+                chatJid,
+                group,
+                channel,
+                lastAgentTimestamp[chatJid] || '',
+              ),
+            )
+          ) {
             logger.info(
               { chatJid, count: messagesToSend.length },
               'Warm container claimed for message',
@@ -497,8 +531,11 @@ async function startMessageLoop(): Promise<void> {
             // Warm container is still starting up — skip cold-start to avoid
             // over-allocating beyond MAX_CONCURRENT_CONTAINERS. The message
             // loop will retry on the next poll cycle once the container is ready.
-            logger.debug({ chatJid }, 'Warm container booting, deferring cold start');
-          /* ved custom end */
+            logger.debug(
+              { chatJid },
+              'Warm container booting, deferring cold start',
+            );
+            /* ved custom end */
           } else {
             // No active or warm container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);
@@ -545,9 +582,11 @@ async function main(): Promise<void> {
   /* ved custom */
   if (warmPool) {
     for (const [jid, group] of Object.entries(registeredGroups)) {
-      warmPool.prewarm(jid, group, sessions[group.folder]).catch((err) =>
-        logger.warn({ jid, err }, 'Failed to prewarm container on startup'),
-      );
+      warmPool
+        .prewarm(jid, group, sessions[group.folder])
+        .catch((err) =>
+          logger.warn({ jid, err }, 'Failed to prewarm container on startup'),
+        );
     }
   }
   /* ved custom end */
@@ -605,7 +644,10 @@ async function main(): Promise<void> {
       if (text) await channel.sendMessage(jid, text);
     },
   });
-  /* ved custom */ startFileSender({ channels, registeredGroups: () => registeredGroups }); /* ved custom end */
+  /* ved custom */ startFileSender({
+    channels,
+    registeredGroups: () => registeredGroups,
+  }); /* ved custom end */
   startIpcWatcher({
     sendMessage: (jid, text) => {
       const channel = findChannel(channels, jid);

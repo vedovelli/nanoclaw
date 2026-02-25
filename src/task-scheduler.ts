@@ -4,7 +4,7 @@ import fs from 'fs';
 
 import {
   ASSISTANT_NAME,
-  /* ved custom */ GROUPS_DIR, /* ved custom end */
+  /* ved custom */ GROUPS_DIR /* ved custom end */,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   SCHEDULER_POLL_INTERVAL,
@@ -79,10 +79,14 @@ async function runTask(
   // as "due" while it's still running (which would queue a back-to-back run).
   let immediateNextRun: string | null = null;
   if (task.schedule_type === 'cron') {
-    const interval = CronExpressionParser.parse(task.schedule_value, { tz: TIMEZONE });
+    const interval = CronExpressionParser.parse(task.schedule_value, {
+      tz: TIMEZONE,
+    });
     immediateNextRun = interval.next().toISOString();
   } else if (task.schedule_type === 'interval') {
-    immediateNextRun = new Date(Date.now() + parseInt(task.schedule_value, 10)).toISOString();
+    immediateNextRun = new Date(
+      Date.now() + parseInt(task.schedule_value, 10),
+    ).toISOString();
   }
   updateTaskNextRun(task.id, immediateNextRun);
 
@@ -164,7 +168,7 @@ async function runTask(
         chatJid: task.chat_jid,
         isMain,
         isScheduledTask: true,
-        /* ved custom */ notifyJid, /* ved custom end */
+        /* ved custom */ notifyJid /* ved custom end */,
         assistantName: ASSISTANT_NAME,
       },
       (proc, containerName) =>

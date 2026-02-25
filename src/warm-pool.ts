@@ -11,7 +11,12 @@ import fs from 'fs';
 import path from 'path';
 import { ChildProcess } from 'child_process';
 
-import { ASSISTANT_NAME, DATA_DIR, MAIN_GROUP_FOLDER, MAX_CONCURRENT_CONTAINERS } from './config.js';
+import {
+  ASSISTANT_NAME,
+  DATA_DIR,
+  MAIN_GROUP_FOLDER,
+  MAX_CONCURRENT_CONTAINERS,
+} from './config.js';
 import { ContainerOutput, runContainerAgent } from './container-runner.js';
 import { GroupQueue } from './group-queue.js';
 import { logger } from './logger.js';
@@ -42,8 +47,15 @@ export class WarmPool {
   }
 
   /** Pre-spawn a warm container for a group. No-op if one already exists. */
-  async prewarm(chatJid: string, group: RegisteredGroup, sessionId?: string): Promise<void> {
-    if (this.queue.getActiveCount() + this.warmCount >= MAX_CONCURRENT_CONTAINERS) {
+  async prewarm(
+    chatJid: string,
+    group: RegisteredGroup,
+    sessionId?: string,
+  ): Promise<void> {
+    if (
+      this.queue.getActiveCount() + this.warmCount >=
+      MAX_CONCURRENT_CONTAINERS
+    ) {
       logger.debug({ chatJid }, 'At concurrency limit, skipping prewarm');
       return;
     }
@@ -90,15 +102,21 @@ export class WarmPool {
           await entry.onOutputRef.fn(output);
         }
       },
-    ).then(() => {
-      this._onContainerExit(chatJid, group, entry);
-    }).catch(() => {
-      this._onContainerExit(chatJid, group, entry);
-    });
+    )
+      .then(() => {
+        this._onContainerExit(chatJid, group, entry);
+      })
+      .catch(() => {
+        this._onContainerExit(chatJid, group, entry);
+      });
   }
 
   /** Called when the container process exits (claimed or not). */
-  private _onContainerExit(chatJid: string, group: RegisteredGroup, entry: WarmEntry): void {
+  private _onContainerExit(
+    chatJid: string,
+    group: RegisteredGroup,
+    entry: WarmEntry,
+  ): void {
     // If claimed, queue.markInactive so the queue can drain waiting work.
     if (entry.claimed) {
       this.queue.markInactive(chatJid);
@@ -147,7 +165,10 @@ export class WarmPool {
     // Guard: fall through to cold start if the process is not yet assigned (container
     // still starting) or has already exited. Both cases mean we can't hand off reliably.
     if (entry.process === null || entry.process.exitCode !== null) {
-      logger.debug({ chatJid }, 'Warm container not ready or already exited, falling through to cold start');
+      logger.debug(
+        { chatJid },
+        'Warm container not ready or already exited, falling through to cold start',
+      );
       return false;
     }
 
@@ -156,7 +177,12 @@ export class WarmPool {
     entry.claimed = true;
 
     // Register with queue so follow-up messages pipe via queue.sendMessage().
-    this.queue.registerProcess(chatJid, entry.process, entry.containerName!, entry.groupFolder);
+    this.queue.registerProcess(
+      chatJid,
+      entry.process,
+      entry.containerName!,
+      entry.groupFolder,
+    );
     this.queue.markActive(chatJid, entry.groupFolder);
 
     // Write the real message to IPC (same protocol as queue.sendMessage).

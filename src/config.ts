@@ -76,4 +76,5 @@ export const TELEGRAM_ONLY =
 
 // Defaults to enabled — set WARM_POOL_ENABLED=false in .env or environment to disable
 export const WARM_POOL_ENABLED =
-  (process.env.WARM_POOL_ENABLED || envConfig.WARM_POOL_ENABLED || 'true') !== 'false';
+  (process.env.WARM_POOL_ENABLED || envConfig.WARM_POOL_ENABLED || 'true') !==
+  'false';

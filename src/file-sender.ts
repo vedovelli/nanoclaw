@@ -49,9 +49,7 @@ export function startFileSender(deps: FileSenderDeps): void {
 
       let fileNames: string[];
       try {
-        fileNames = fs
-          .readdirSync(filesDir)
-          .filter((f) => f.endsWith('.json'));
+        fileNames = fs.readdirSync(filesDir).filter((f) => f.endsWith('.json'));
       } catch {
         continue;
       }
@@ -83,9 +81,7 @@ export function startFileSender(deps: FileSenderDeps): void {
           }
 
           // Find the channel for this JID
-          const channel = deps.channels.find((ch) =>
-            ch.ownsJid(data.chatJid),
-          );
+          const channel = deps.channels.find((ch) => ch.ownsJid(data.chatJid));
           if (!channel) {
             logger.warn(
               { chatJid: data.chatJid },

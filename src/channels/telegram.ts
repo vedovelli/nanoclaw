@@ -170,14 +170,15 @@ export class TelegramChannel implements Channel {
         const url = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
         const res = await fetch(url);
         if (!res.ok) {
-          logger.warn({ status: res.status }, 'Telegram voice file download returned non-OK');
+          logger.warn(
+            { status: res.status },
+            'Telegram voice file download returned non-OK',
+          );
           content = '[Voice message]';
         } else {
           const buffer = Buffer.from(await res.arrayBuffer());
           const transcript = await transcribeAudioBuffer(buffer);
-          content = transcript
-            ? `[Voice: ${transcript}]`
-            : '[Voice message]';
+          content = transcript ? `[Voice: ${transcript}]` : '[Voice message]';
         }
       } catch (err) {
         logger.error({ err }, 'Telegram voice download/transcription failed');
@@ -259,7 +260,10 @@ export class TelegramChannel implements Channel {
       });
       logger.info({ jid, filename }, 'Telegram file sent');
     } catch (err) {
-      logger.error({ jid, filename: filename, err }, 'Failed to send Telegram file');
+      logger.error(
+        { jid, filename: filename, err },
+        'Failed to send Telegram file',
+      );
       throw err;
     }
   }

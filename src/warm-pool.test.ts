@@ -198,10 +198,12 @@ describe('WarmPool', () => {
   it('standby output is discarded before claim', async () => {
     const { runContainerAgent } = await import('./container-runner.js');
     let capturedOnOutput: ((output: any) => Promise<void>) | undefined;
-    vi.mocked(runContainerAgent).mockImplementation(async (_g, _i, _op, onOutput) => {
-      capturedOnOutput = onOutput;
-      return { status: 'success', result: null };
-    });
+    vi.mocked(runContainerAgent).mockImplementation(
+      async (_g, _i, _op, onOutput) => {
+        capturedOnOutput = onOutput;
+        return { status: 'success', result: null };
+      },
+    );
     await pool.prewarm('group1@g.us', makeGroup() as any);
     const userHandler = vi.fn();
     await capturedOnOutput?.({ status: 'success', result: 'some output' });
@@ -211,17 +213,23 @@ describe('WarmPool', () => {
   it('output after claim is dispatched to real handler', async () => {
     const { runContainerAgent } = await import('./container-runner.js');
     let capturedOnOutput: ((output: any) => Promise<void>) | undefined;
-    vi.mocked(runContainerAgent).mockImplementation(async (_g, _i, _op, onOutput) => {
-      capturedOnOutput = onOutput;
-      return { status: 'success', result: null };
-    });
+    vi.mocked(runContainerAgent).mockImplementation(
+      async (_g, _i, _op, onOutput) => {
+        capturedOnOutput = onOutput;
+        return { status: 'success', result: null };
+      },
+    );
     pool.prewarm('group1@g.us', makeGroup() as any);
     const entry = (pool as any).warmContainers.get('group1@g.us');
     entry.process = { exitCode: null } as any;
     entry.containerName = 'ctr-1';
     const userHandler = vi.fn();
     pool.claim('group1@g.us', 'hi', userHandler);
-    const fakeOutput = { status: 'success', result: 'Hello!', newSessionId: undefined };
+    const fakeOutput = {
+      status: 'success',
+      result: 'Hello!',
+      newSessionId: undefined,
+    };
     await capturedOnOutput?.(fakeOutput);
     expect(userHandler).toHaveBeenCalledWith(fakeOutput);
   });
@@ -238,7 +246,10 @@ describe('WarmPool', () => {
     const { runContainerAgent } = await import('./container-runner.js');
     let resolveContainer!: () => void;
     vi.mocked(runContainerAgent).mockImplementation(
-      () => new Promise<any>((resolve) => { resolveContainer = () => resolve({ status: 'success', result: null }); }),
+      () =>
+        new Promise<any>((resolve) => {
+          resolveContainer = () => resolve({ status: 'success', result: null });
+        }),
     );
     await pool.prewarm('group1@g.us', makeGroup() as any);
     expect(vi.mocked(runContainerAgent)).toHaveBeenCalledTimes(1);
