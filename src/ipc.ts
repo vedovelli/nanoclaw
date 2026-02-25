@@ -9,6 +9,9 @@ import {
   MAIN_GROUP_FOLDER,
   TIMEZONE,
 } from './config.js';
+/* ved custom */
+import { spawn } from 'child_process';
+/* ved custom end */
 import { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
@@ -382,6 +385,97 @@ export async function processTaskIpc(
       break;
 
     default:
-      logger.warn({ type: data.type }, 'Unknown IPC task type');
+      /* ved custom */
+      {
+        const xType = data.type as string;
+        if (xType?.startsWith('x_') && isMain) {
+          const xRaw = data as unknown as Record<string, unknown>;
+          const requestId = xRaw.requestId as string | undefined;
+          if (requestId) {
+            const xData = xRaw as Record<string, string | undefined>;
+            const resultsDir = `${DATA_DIR}/ipc/${sourceGroup}/x_results`;
+            fs.mkdirSync(resultsDir, { recursive: true });
+
+            const scriptMap: Record<string, string> = {
+              x_post: 'post',
+              x_like: 'like',
+              x_reply: 'reply',
+              x_retweet: 'retweet',
+              x_quote: 'quote',
+            };
+            const scriptName = scriptMap[xType];
+
+            if (scriptName) {
+              logger.info({ type: xType, requestId }, 'Processing X request');
+              const scriptArgs: Record<string, string | undefined> = {};
+              if (xData.content) scriptArgs.content = xData.content;
+              if (xData.tweetUrl) scriptArgs.tweetUrl = xData.tweetUrl;
+              if (xData.comment) scriptArgs.comment = xData.comment;
+
+              const scriptPath = `${process.cwd()}/.claude/skills/x-integration/scripts/${scriptName}.ts`;
+              const tsxBin = path.resolve(process.cwd(), 'node_modules/.bin/tsx');
+              const proc = spawn(process.execPath, [tsxBin, scriptPath], {
+                cwd: process.cwd(),
+                env: { ...process.env, NANOCLAW_ROOT: process.cwd() },
+                stdio: ['pipe', 'pipe', 'pipe'],
+              });
+
+              let stdout = '';
+              let stderr = '';
+              proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+              proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+              proc.stdin.write(JSON.stringify(scriptArgs));
+              proc.stdin.end();
+
+              // Fire-and-forget: return immediately so the IPC watcher is not blocked.
+              // The container polls x_results/ independently and owns the timeout.
+              new Promise<{ success: boolean; message: string }>((resolve) => {
+                const timer = setTimeout(() => {
+                  proc.kill('SIGTERM');
+                  resolve({ success: false, message: 'Script timed out (55s)' });
+                }, 55000);
+
+                proc.on('close', (code: number | null) => {
+                  clearTimeout(timer);
+                  if (code !== 0) {
+                    resolve({ success: false, message: `Script exited with code: ${code}` });
+                    return;
+                  }
+                  try {
+                    const lines = stdout.trim().split('\n');
+                    resolve(JSON.parse(lines[lines.length - 1]));
+                  } catch {
+                    resolve({ success: false, message: `Failed to parse output: ${stdout.slice(0, 200)}` });
+                  }
+                });
+
+                proc.on('error', (err: Error) => {
+                  clearTimeout(timer);
+                  resolve({ success: false, message: `Failed to spawn: ${err.message}` });
+                });
+              }).then((result) => {
+                fs.writeFileSync(`${resultsDir}/${requestId}.json`, JSON.stringify(result));
+                if (result.success) {
+                  logger.info({ type: xType, requestId }, 'X request completed');
+                } else {
+                  logger.error({ type: xType, requestId, message: result.message, stderr: stderr.slice(0, 500) }, 'X request failed');
+                }
+              }).catch((err: Error) => {
+                logger.error({ type: xType, requestId, err: err.message }, 'X request promise rejected');
+              });
+            } else {
+              logger.warn({ type: xType, sourceGroup }, 'X integration: unknown x_ type');
+            }
+          } else {
+            logger.warn({ type: xType }, 'X integration: missing requestId');
+          }
+        } else if (xType?.startsWith('x_') && !isMain) {
+          logger.warn({ sourceGroup, type: xType }, 'X integration blocked: not main group');
+        } else {
+          logger.warn({ type: data.type }, 'Unknown IPC task type');
+        }
+      }
+      /* ved custom end */
   }
 }
