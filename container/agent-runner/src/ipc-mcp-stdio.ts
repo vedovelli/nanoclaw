@@ -295,10 +295,11 @@ async function waitForXResult(requestId: string, maxWait = 60000): Promise<{ suc
     if (fs.existsSync(resultFile)) {
       try {
         const result = JSON.parse(fs.readFileSync(resultFile, 'utf-8'));
-        fs.unlinkSync(resultFile);
         return result;
       } catch (err) {
         return { success: false, message: `Failed to read result: ${err}` };
+      } finally {
+        try { fs.unlinkSync(resultFile); } catch {}
       }
     }
     await new Promise(resolve => setTimeout(resolve, pollInterval));

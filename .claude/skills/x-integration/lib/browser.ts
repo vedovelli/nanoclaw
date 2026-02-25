@@ -99,6 +99,13 @@ export function extractTweetId(input: string): string | null {
 }
 
 /**
+ * Check whether the current page is authenticated (X session still valid)
+ */
+export async function checkLoginStatus(page: Page): Promise<boolean> {
+  return page.locator('[data-testid="SideNav_AccountSwitcher_Button"]').isVisible().catch(() => false);
+}
+
+/**
  * Navigate to a tweet page
  */
 export async function navigateToTweet(
@@ -116,6 +123,11 @@ export async function navigateToTweet(
   try {
     await page.goto(url, { timeout: config.timeouts.navigation, waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(config.timeouts.pageLoad);
+
+    const loggedIn = await checkLoginStatus(page);
+    if (!loggedIn) {
+      return { page, success: false, error: 'X login expired. Run /x-integration to re-authenticate.' };
+    }
 
     const exists = await page.locator('article[data-testid="tweet"]').first().isVisible().catch(() => false);
     if (!exists) {

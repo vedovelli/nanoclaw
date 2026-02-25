@@ -4,7 +4,7 @@
  * Usage: echo '{"content":"Hello world"}' | npx tsx post.ts
  */
 
-import { getBrowserContext, runScript, validateContent, config, ScriptResult } from '../lib/browser.js';
+import { getBrowserContext, checkLoginStatus, runScript, validateContent, config, ScriptResult } from '../lib/browser.js';
 
 interface PostInput {
   content: string;
@@ -25,12 +25,9 @@ async function postTweet(input: PostInput): Promise<ScriptResult> {
     await page.waitForTimeout(config.timeouts.pageLoad);
 
     // Check if logged in
-    const isLoggedIn = await page.locator('[data-testid="SideNav_AccountSwitcher_Button"]').isVisible().catch(() => false);
+    const isLoggedIn = await checkLoginStatus(page);
     if (!isLoggedIn) {
-      const onLoginPage = await page.locator('input[autocomplete="username"]').isVisible().catch(() => false);
-      if (onLoginPage) {
-        return { success: false, message: 'X login expired. Run /x-integration to re-authenticate.' };
-      }
+      return { success: false, message: 'X login expired. Run /x-integration to re-authenticate.' };
     }
 
     // Find and fill tweet input

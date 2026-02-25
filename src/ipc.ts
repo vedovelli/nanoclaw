@@ -421,16 +421,20 @@ export async function processTaskIpc(
               });
 
               let stdout = '';
+              let stderr = '';
               proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+              proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
 
               proc.stdin.write(JSON.stringify(scriptArgs));
               proc.stdin.end();
 
-              const resultPromise = new Promise<{ success: boolean; message: string }>((resolve) => {
+              // Fire-and-forget: return immediately so the IPC watcher is not blocked.
+              // The container polls x_results/ independently and owns the timeout.
+              new Promise<{ success: boolean; message: string }>((resolve) => {
                 const timer = setTimeout(() => {
                   proc.kill('SIGTERM');
-                  resolve({ success: false, message: 'Script timed out (120s)' });
-                }, 120000);
+                  resolve({ success: false, message: 'Script timed out (55s)' });
+                }, 55000);
 
                 proc.on('close', (code: number | null) => {
                   clearTimeout(timer);
@@ -450,15 +454,16 @@ export async function processTaskIpc(
                   clearTimeout(timer);
                   resolve({ success: false, message: `Failed to spawn: ${err.message}` });
                 });
+              }).then((result) => {
+                fs.writeFileSync(`${resultsDir}/${requestId}.json`, JSON.stringify(result));
+                if (result.success) {
+                  logger.info({ type: xType, requestId }, 'X request completed');
+                } else {
+                  logger.error({ type: xType, requestId, message: result.message, stderr: stderr.slice(0, 500) }, 'X request failed');
+                }
+              }).catch((err: Error) => {
+                logger.error({ type: xType, requestId, err: err.message }, 'X request promise rejected');
               });
-
-              const result = await resultPromise;
-              fs.writeFileSync(`${resultsDir}/${requestId}.json`, JSON.stringify(result));
-              if (result.success) {
-                logger.info({ type: xType, requestId }, 'X request completed');
-              } else {
-                logger.error({ type: xType, requestId, message: result.message }, 'X request failed');
-              }
             } else {
               logger.warn({ type: xType, sourceGroup }, 'X integration: unknown x_ type');
             }
