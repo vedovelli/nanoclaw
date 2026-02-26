@@ -20,6 +20,7 @@ import {
   getDueTasks,
   getTaskById,
   logTaskRun,
+  /* ved custom */ storeMessage, /* ved custom end */
   updateTask,
   updateTaskAfterRun,
   updateTaskNextRun,
@@ -182,6 +183,20 @@ async function runTask(
           // background task results) to appear in Telegram even when the task was
           // not triggered by a user message.
           // Upstream was: await deps.sendMessage(task.chat_jid, streamedOutput.result);
+          try {
+            storeMessage({
+              id: `bot-task-${task.id}-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
+              chat_jid: task.chat_jid,
+              sender: 'assistant',
+              sender_name: 'Assistant',
+              content: streamedOutput.result,
+              timestamp: new Date().toISOString(),
+              is_from_me: true,
+              is_bot_message: true,
+            });
+          } catch {
+            // persistence is best-effort
+          }
           /* ved custom end */
           scheduleClose();
         }
