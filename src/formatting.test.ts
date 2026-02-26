@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
-import { ASSISTANT_NAME, TRIGGER_PATTERN } from './config.js';
+import { ASSISTANT_NAME, TIMEZONE, TRIGGER_PATTERN } from './config.js';
 import {
   escapeXml,
   formatMessages,
   formatOutbound,
   stripInternalTags,
+  toLocalTime,
 } from './router.js';
 import { NewMessage } from './types.js';
 
@@ -55,14 +56,47 @@ describe('escapeXml', () => {
   });
 });
 
+// --- toLocalTime ---
+
+describe('toLocalTime', () => {
+  it('converts UTC timestamp to local time in a given timezone', () => {
+    // 2026-02-26T11:30:00.000Z = 08:30 in America/Sao_Paulo (UTC-3)
+    expect(toLocalTime('2026-02-26T11:30:00.000Z', 'America/Sao_Paulo')).toBe(
+      '2026-02-26 08:30',
+    );
+  });
+
+  it('converts UTC midnight correctly across a date boundary', () => {
+    // 2026-02-26T03:00:00.000Z = 2026-02-26T00:00 in America/Sao_Paulo (UTC-3)
+    expect(toLocalTime('2026-02-26T03:00:00.000Z', 'America/Sao_Paulo')).toBe(
+      '2026-02-26 00:00',
+    );
+  });
+
+  it('returns raw string for invalid date input', () => {
+    expect(toLocalTime('not-a-date', 'America/Sao_Paulo')).toBe('not-a-date');
+  });
+});
+
 // --- formatMessages ---
 
 describe('formatMessages', () => {
-  it('formats a single message as XML', () => {
-    const result = formatMessages([makeMsg()]);
+  it('formats a single message as XML with local time', () => {
+    const timestamp = '2024-01-01T00:00:00.000Z';
+    const result = formatMessages([makeMsg({ timestamp })]);
+    // Expected time is the timestamp converted to local timezone (not raw UTC ISO)
+    const expectedTime = new Date(timestamp).toLocaleString('sv-SE', {
+      timeZone: TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
     expect(result).toBe(
       '<messages>\n' +
-        '<message sender="Alice" time="2024-01-01T00:00:00.000Z">hello</message>\n' +
+        `<message sender="Alice" time="${expectedTime}">hello</message>\n` +
         '</messages>',
     );
   });
