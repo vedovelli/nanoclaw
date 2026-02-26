@@ -20,6 +20,7 @@ describe('routeOutbound', () => {
         chat_jid: 'tg:123',
         content: 'hello',
         is_bot_message: true,
+        is_from_me: true,
       }),
     );
   });

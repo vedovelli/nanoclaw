@@ -39,16 +39,20 @@ export async function routeOutbound(
   if (!channel) throw new Error(`No channel for JID: ${jid}`);
   await channel.sendMessage(jid, text);
   /* ved custom */
-  storeMessage({
-    id: `bot-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    chat_jid: jid,
-    sender: 'assistant',
-    sender_name: 'Assistant',
-    content: text,
-    timestamp: Date.now().toString(),
-    is_from_me: true,
-    is_bot_message: true,
-  });
+  try {
+    storeMessage({
+      id: `bot-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      chat_jid: jid,
+      sender: 'assistant',
+      sender_name: 'Assistant',
+      content: text,
+      timestamp: Date.now().toString(),
+      is_from_me: true,
+      is_bot_message: true,
+    });
+  } catch {
+    // persistence is best-effort; do not surface as a send failure
+  }
   /* ved custom end */
 }
 
