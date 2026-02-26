@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { ASSISTANT_NAME, TRIGGER_PATTERN } from './config.js';
+import { ASSISTANT_NAME, TIMEZONE, TRIGGER_PATTERN } from './config.js';
 import {
   escapeXml,
   formatMessages,
@@ -58,11 +58,22 @@ describe('escapeXml', () => {
 // --- formatMessages ---
 
 describe('formatMessages', () => {
-  it('formats a single message as XML', () => {
-    const result = formatMessages([makeMsg()]);
+  it('formats a single message as XML with local time', () => {
+    const timestamp = '2024-01-01T00:00:00.000Z';
+    const result = formatMessages([makeMsg({ timestamp })]);
+    // Expected time is the timestamp converted to local timezone (not raw UTC ISO)
+    const expectedTime = new Date(timestamp).toLocaleString('sv-SE', {
+      timeZone: TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
     expect(result).toBe(
       '<messages>\n' +
-        '<message sender="Alice" time="2024-01-01T00:00:00.000Z">hello</message>\n' +
+        `<message sender="Alice" time="${expectedTime}">hello</message>\n` +
         '</messages>',
     );
   });
