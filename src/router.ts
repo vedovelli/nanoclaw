@@ -12,11 +12,27 @@ export function escapeXml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-export function formatMessages(messages: NewMessage[]): string {
+export function formatMessages(
+  messages: NewMessage[],
+  /* ved custom */
+  recentExchanges?: Array<{ userMessage: string; botMessage: string }>,
+  /* ved custom end */
+): string {
   const lines = messages.map(
     (m) =>
       `<message sender="${escapeXml(m.sender_name)}" time="${m.timestamp}">${escapeXml(m.content)}</message>`,
   );
+  /* ved custom */
+  if (recentExchanges && recentExchanges.length > 0) {
+    const pairs = recentExchanges
+      .map(
+        (e) =>
+          `  <exchange>\n    <user>${escapeXml(e.userMessage)}</user>\n    <assistant>${escapeXml(e.botMessage)}</assistant>\n  </exchange>`,
+      )
+      .join('\n');
+    return `<recent_context>\n${pairs}\n</recent_context>\n<messages>\n${lines.join('\n')}\n</messages>`;
+  }
+  /* ved custom end */
   return `<messages>\n${lines.join('\n')}\n</messages>`;
 }
 
