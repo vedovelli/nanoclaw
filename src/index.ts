@@ -689,7 +689,11 @@ async function main(): Promise<void> {
     sendMessage: (jid, text) => {
       const channel = findChannel(channels, jid);
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
-      return channel.sendMessage(jid, text);
+      /* ved custom */
+      const filtered = formatOutbound(text);
+      if (!filtered) return Promise.resolve();
+      return channel.sendMessage(jid, filtered);
+      /* ved custom end */
     },
     registeredGroups: () => registeredGroups,
     registerGroup,
