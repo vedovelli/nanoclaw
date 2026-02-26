@@ -7,18 +7,19 @@ description: Check Flare for new unresolved errors in Gestão Simples. For each 
 
 ## Notification Rules — Read Before Doing Anything
 
-**You may only call `mcp__nanoclaw__send_message` for these three events:**
+**You may only call `mcp__nanoclaw__send_message` for these four events:**
 1. A new Flare error was found and a fix PR was opened
 2. Review comments were addressed and pushed
 3. A merged PR was resolved on Flare
+4. Flare MCP has failed 3 or more consecutive runs AND 24h have passed since the last alert
 
 **In every other situation, produce no output and call no tools except `<internal>`.**
 
 This means:
-- Flare MCP unavailable → silent exit
-- Flare API returns 403, 401, or any auth error → silent exit
-- Flare API returns any other error → silent exit
-- No newly merged PRs, no review comments, no new errors → silent exit
+- Flare MCP unavailable → increment failure counter, alert if threshold reached, then silent exit
+- Flare API returns 403, 401, or any auth error → same (increment counter, alert if threshold)
+- Flare API returns any other error → same (increment counter, alert if threshold)
+- No newly merged PRs, no review comments, no new errors → silent exit (do NOT increment failure counter — this is a success run)
 
 Silent exit means your **entire output** is:
 ```
@@ -43,6 +44,7 @@ Each fix uses an isolated git worktree so multiple errors can be handled in the 
 Read `/workspace/group/flare-seen-errors.json`. If it doesn't exist, start with `{"seen": []}`.
 Read `/workspace/group/flare-merged-prs.json`. If it doesn't exist, start with `{"notified": []}`.
 Read `/workspace/group/flare-pr-reviews.json`. If it doesn't exist, start with `{"addressed": {}}`.
+Read `/workspace/group/flare-health.json`. If it doesn't exist, start with `{"consecutiveFailures": 0, "lastAlertedAt": null}`.
 
 ### 2. Initialize the bare repo
 
@@ -155,7 +157,22 @@ git worktree remove /tmp/review-<pr-number>
 
 Use Flare MCP to list all unresolved errors for the Gestão Simples project.
 
-If the Flare MCP tools are unavailable, unauthenticated, or return any error — treat it the same as "no new errors": exit silently with `<internal>Nothing to do this run.</internal>`. Do NOT notify Fabio about the MCP failure.
+**If the Flare MCP tools are unavailable, unauthenticated, or return any error:**
+
+a) Increment `consecutiveFailures` in `flare-health.json` and save immediately.
+
+b) Check if an alert should be sent:
+- `consecutiveFailures >= 3` **AND**
+- `lastAlertedAt` is null OR more than 24 hours ago
+
+If both conditions are met:
+- Update `lastAlertedAt` to the current ISO timestamp and save `flare-health.json`.
+- Call `mcp__nanoclaw__send_message`:
+  > "⚠️ Flare monitor: MCP connection has been failing for {{consecutiveFailures}} consecutive runs. Errors may be going undetected. Check the FLARE_API_TOKEN and network access."
+
+c) Exit silently: `<internal>Flare MCP unavailable ({{consecutiveFailures}} consecutive failures).</internal>`
+
+**If the Flare MCP call succeeds:** Reset `consecutiveFailures` to 0 and `lastAlertedAt` to null in `flare-health.json` and save before continuing.
 
 ### 6. For each error NOT in the seen list
 
