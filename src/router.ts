@@ -67,6 +67,7 @@ export function formatOutbound(rawText: string): string {
   return text;
 }
 
+/* ved custom */
 export async function routeOutbound(
   channels: Channel[],
   jid: string,
@@ -75,7 +76,6 @@ export async function routeOutbound(
   const channel = channels.find((c) => c.ownsJid(jid) && c.isConnected());
   if (!channel) throw new Error(`No channel for JID: ${jid}`);
   await channel.sendMessage(jid, text);
-  /* ved custom */
   try {
     storeMessage({
       id: `bot-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -90,8 +90,8 @@ export async function routeOutbound(
   } catch {
     // persistence is best-effort; do not surface as a send failure
   }
-  /* ved custom end */
 }
+/* ved custom end */
 
 export function findChannel(
   channels: Channel[],
