@@ -78,3 +78,8 @@ export const TELEGRAM_ONLY =
 export const WARM_POOL_ENABLED =
   (process.env.WARM_POOL_ENABLED || envConfig.WARM_POOL_ENABLED || 'true') !==
   'false';
+
+/* ved custom */
+/** Number of recent user+bot exchange pairs to inject into each agent prompt. */
+export const RECENT_CONTEXT_PAIRS = 3;
+/* ved custom end */
