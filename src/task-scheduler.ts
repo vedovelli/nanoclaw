@@ -112,11 +112,10 @@ async function runTask(
   }
 
   /* ved custom */
-  // If the task's chat_jid is a virtual JID (e.g. system:background) with no
-  // channel, look up its notifyJid so messages route to a real channel.
+  // Look up notifyJid so the container knows which JID to target with the
+  // send_message MCP tool. Auto-forwarding of agent output is suppressed below.
   const chatGroup = groups[task.chat_jid];
   const notifyJid = chatGroup?.containerConfig?.notifyJid;
-  const deliveryJid = notifyJid || task.chat_jid;
   /* ved custom end */
 
   // Update tasks snapshot for container to read (filtered by group)
@@ -176,9 +175,14 @@ async function runTask(
       async (streamedOutput: ContainerOutput) => {
         if (streamedOutput.result) {
           result = streamedOutput.result;
-          // Forward result to user (sendMessage handles formatting)
-          // Use deliveryJid so virtual JIDs (e.g. system:background) route to a real channel
-          await deps.sendMessage(deliveryJid, streamedOutput.result);
+          /* ved custom */
+          // Do NOT auto-forward agent output to the channel.
+          // Only explicit send_message MCP tool calls (IPC path) should reach the user.
+          // Auto-forwarding caused internal task outputs (e.g. rate-limit notices,
+          // background task results) to appear in Telegram even when the task was
+          // not triggered by a user message.
+          // Upstream was: await deps.sendMessage(task.chat_jid, streamedOutput.result);
+          /* ved custom end */
           scheduleClose();
         }
         if (streamedOutput.status === 'success') {
