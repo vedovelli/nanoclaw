@@ -470,9 +470,9 @@ async function runQuery(
           },
         },
         flare: {
-          command: 'npx',
-          args: ['-y', 'mcp-remote', 'https://flareapp.io/mcp',
-                 '--header', `Authorization: Bearer ${sdkEnv.FLARE_API_TOKEN || ''}`],
+          type: 'http' as const,
+          url: 'https://flareapp.io/mcp',
+          headers: { Authorization: `Bearer ${sdkEnv.FLARE_API_TOKEN || ''}` },
         },
         'basic-memory-cloud': {
           command: 'npx',

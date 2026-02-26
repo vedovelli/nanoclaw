@@ -235,6 +235,15 @@ ls container/skills/
 
 Also verify the X integration IPC handler is intact in `src/ipc.ts` (the `spawn` import and the `x_*` handler block in the `default` case) and the X MCP tools block is intact in `container/agent-runner/src/ipc-mcp-stdio.ts`. These are caught by the marker count check — the opening marker count should be **at least 12**.
 
+Also verify that the `mcpServers` block in `container/agent-runner/src/index.ts` does not have duplicate keys. If upstream ever adds a `flare:` or `basic-memory-cloud:` entry outside our custom block, there would be two entries with the same key — a TypeScript error. Check:
+
+```bash
+grep -c "flare:" container/agent-runner/src/index.ts
+grep -c "'basic-memory-cloud':" container/agent-runner/src/index.ts
+```
+
+Each must return exactly `1`. If either returns `2`, remove the upstream-added entry (outside the `ved custom` block) and keep ours.
+
 If anything is missing or misplaced, fix it, commit to the sync branch, and push before requesting review.
 
 **When adding new customizations to upstream files in the future**, always wrap them with `/* ved custom */` ... `/* ved custom end */` (or `# ved custom` / `# ved custom end` in Dockerfile/shell), and update the customizations tracker.
