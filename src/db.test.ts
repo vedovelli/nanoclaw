@@ -7,7 +7,7 @@ import {
   getAllChats,
   getMessagesSince,
   getNewMessages,
-  getRecentExchanges,
+  /* ved custom */ getRecentExchanges, /* ved custom end */
   getTaskById,
   storeChatMetadata,
   storeMessage,
@@ -390,6 +390,7 @@ describe('task CRUD', () => {
   });
 });
 
+/* ved custom */
 describe('getRecentExchanges', () => {
   it('returns empty array when no bot messages exist', () => {
     storeChatMetadata('g1', '2024-01-01T00:00:00.000Z');
@@ -434,3 +435,4 @@ describe('getRecentExchanges', () => {
     expect(getRecentExchanges('g5', 5)).toEqual([]);
   });
 });
+/* ved custom end */

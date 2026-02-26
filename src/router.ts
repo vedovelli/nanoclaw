@@ -41,7 +41,7 @@ export function formatMessages(
 ): string {
   const lines = messages.map(
     (m) =>
-      `<message sender="${escapeXml(m.sender_name)}" time="${toLocalTime(m.timestamp)}">${escapeXml(m.content)}</message>`,
+      /* ved custom */ `<message sender="${escapeXml(m.sender_name)}" time="${toLocalTime(m.timestamp)}">${escapeXml(m.content)}</message>`, /* ved custom end */
   );
   /* ved custom */
   if (recentExchanges && recentExchanges.length > 0) {

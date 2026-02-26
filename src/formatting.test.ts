@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
-import { ASSISTANT_NAME, TIMEZONE, TRIGGER_PATTERN } from './config.js';
+import { ASSISTANT_NAME, /* ved custom */ TIMEZONE, /* ved custom end */ TRIGGER_PATTERN } from './config.js';
 import {
   escapeXml,
   formatMessages,
   formatOutbound,
   stripInternalTags,
-  toLocalTime,
+  /* ved custom */ toLocalTime, /* ved custom end */
 } from './router.js';
 import { NewMessage } from './types.js';
 
@@ -58,6 +58,7 @@ describe('escapeXml', () => {
 
 // --- toLocalTime ---
 
+/* ved custom */
 describe('toLocalTime', () => {
   it('converts UTC timestamp to local time in a given timezone', () => {
     // 2026-02-26T11:30:00.000Z = 08:30 in America/Sao_Paulo (UTC-3)
@@ -77,10 +78,12 @@ describe('toLocalTime', () => {
     expect(toLocalTime('not-a-date', 'America/Sao_Paulo')).toBe('not-a-date');
   });
 });
+/* ved custom end */
 
 // --- formatMessages ---
 
 describe('formatMessages', () => {
+  /* ved custom */
   it('formats a single message as XML with local time', () => {
     const timestamp = '2024-01-01T00:00:00.000Z';
     const result = formatMessages([makeMsg({ timestamp })]);
@@ -100,6 +103,7 @@ describe('formatMessages', () => {
         '</messages>',
     );
   });
+  /* ved custom end */
 
   it('formats multiple messages', () => {
     const msgs = [
