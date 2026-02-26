@@ -10,6 +10,7 @@ import {
   TELEGRAM_ONLY,
   TRIGGER_PATTERN,
   WARM_POOL_ENABLED,
+  /* ved custom */ RECENT_CONTEXT_PAIRS, /* ved custom end */
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
 import { TelegramChannel } from './channels/telegram.js';
@@ -37,6 +38,7 @@ import {
   setSession,
   storeChatMetadata,
   storeMessage,
+  /* ved custom */ getRecentExchanges, /* ved custom end */
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 /* ved custom */
@@ -248,7 +250,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(missedMessages);
+  /* ved custom */
+  const recentExchanges = getRecentExchanges(chatJid, RECENT_CONTEXT_PAIRS);
+  /* ved custom end */
+  const prompt = formatMessages(missedMessages, /* ved custom */ recentExchanges /* ved custom end */);
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
