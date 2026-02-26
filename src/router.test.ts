@@ -15,12 +15,13 @@ describe('routeOutbound', () => {
 
   it('stores bot message after sending', async () => {
     await routeOutbound([mockChannel as any], 'tg:123', 'hello');
-    expect(db.storeMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chat_jid: 'tg:123',
-        content: 'hello',
-        is_bot_message: true,
-      }),
-    );
+    const call = (db.storeMessage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call).toMatchObject({
+      chat_jid: 'tg:123',
+      content: 'hello',
+      is_bot_message: true,
+    });
+    // timestamp must be ISO 8601 so SQL lexicographic ordering works correctly
+    expect(new Date(call.timestamp).toISOString()).toBe(call.timestamp);
   });
 });

@@ -68,7 +68,7 @@ export async function routeOutbound(
     sender: 'assistant',
     sender_name: 'Assistant',
     content: text,
-    timestamp: Date.now().toString(),
+    timestamp: new Date().toISOString(),
     is_from_me: true,
     is_bot_message: true,
   });
