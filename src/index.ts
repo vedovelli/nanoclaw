@@ -686,9 +686,13 @@ async function main(): Promise<void> {
     registeredGroups: () => registeredGroups,
   }); /* ved custom end */
   startIpcWatcher({
-    sendMessage: (jid, text) => {
+    sendMessage: (jid, rawText) => {
       const channel = findChannel(channels, jid);
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
+      /* ved custom */
+      const text = formatOutbound(rawText);
+      if (!text) return Promise.resolve();
+      /* ved custom end */
       return channel.sendMessage(jid, text);
     },
     registeredGroups: () => registeredGroups,
