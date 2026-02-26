@@ -41,6 +41,20 @@ Single Node.js process that connects to WhatsApp, routes messages to Claude Agen
 | `/ved-sync-upstream` | Pull upstream changes into a branch + PR for human review before merging |
 | `/ved-add-customization` | Protocol checklist before customizing any upstream file — markers, tracker, build |
 
+## Code Traversal and Editing — HARD REQUIREMENT
+
+**You MUST use the Serena MCP tools for all code reading, traversal, and editing tasks. This is non-negotiable.**
+
+- Use `mcp__serena__get_symbols_overview` to understand file structure before reading
+- Use `mcp__serena__find_symbol` to locate specific functions, classes, or methods
+- Use `mcp__serena__search_for_pattern` when you don't know the exact symbol name
+- Use `mcp__serena__find_referencing_symbols` to trace usages and call sites
+- Use `mcp__serena__replace_symbol_body` to replace an entire function or class
+- Use `mcp__serena__insert_after_symbol` / `mcp__serena__insert_before_symbol` to add code
+- Only fall back to `Read` / `Edit` / `Grep` for non-code files or when a targeted symbol read is not possible
+
+Do **not** read entire source files to understand structure. Use Serena's symbol tools to navigate precisely and avoid loading unnecessary code into context.
+
 ## Development
 
 Run commands directly—don't tell the user to run them.
