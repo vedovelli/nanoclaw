@@ -679,3 +679,35 @@ function migrateJsonState(): void {
     }
   }
 }
+
+/* ved custom */
+export function getRecentExchanges(
+  chatJid: string,
+  limit: number,
+): Array<{ userMessage: string; botMessage: string }> {
+  // For each of the last `limit` bot messages, find the most recent user message
+  // that was sent before it in the same chat. Returns pairs in chronological order.
+  const rows = db
+    .prepare(
+      `SELECT u.content AS userMessage, b.content AS botMessage
+       FROM messages b
+       JOIN messages u ON (
+         u.chat_jid = b.chat_jid
+         AND u.is_bot_message = 0
+         AND u.timestamp < b.timestamp
+         AND u.timestamp = (
+           SELECT MAX(timestamp) FROM messages
+           WHERE chat_jid = b.chat_jid
+             AND is_bot_message = 0
+             AND timestamp < b.timestamp
+         )
+       )
+       WHERE b.chat_jid = ?
+         AND b.is_bot_message = 1
+       ORDER BY b.timestamp DESC
+       LIMIT ?`,
+    )
+    .all(chatJid, limit) as Array<{ userMessage: string; botMessage: string }>;
+  return rows.reverse(); // chronological order (oldest first)
+}
+/* ved custom end */
