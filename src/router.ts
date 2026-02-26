@@ -8,6 +8,8 @@ import { TIMEZONE } from './config.js';
 /** Format UTC ISO timestamp as local date-time string for agent prompts.
  * Prevents Claude from misreading UTC Z timestamps as local time.
  * Falls back to the raw string if the input is not a valid date.
+ * Seconds are intentionally omitted — minute precision is sufficient
+ * for conversational context; scheduling uses cron/interval values, not these strings.
  */
 function toLocalTime(isoStr: string): string {
   const d = new Date(isoStr);
@@ -36,7 +38,7 @@ export function escapeXml(s: string): string {
 export function formatMessages(messages: NewMessage[]): string {
   const lines = messages.map(
     (m) =>
-      `<message sender="${escapeXml(m.sender_name)}" time="${/* ved custom */toLocalTime(m.timestamp)/* ved custom end */}">${escapeXml(m.content)}</message>`,
+      `<message sender="${escapeXml(m.sender_name)}" time="${toLocalTime(m.timestamp)}">${escapeXml(m.content)}</message>`,
   );
   return `<messages>\n${lines.join('\n')}\n</messages>`;
 }
