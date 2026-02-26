@@ -6,6 +6,7 @@ import {
   formatMessages,
   formatOutbound,
   stripInternalTags,
+  toLocalTime,
 } from './router.js';
 import { NewMessage } from './types.js';
 
@@ -52,6 +53,28 @@ describe('escapeXml', () => {
 
   it('handles empty string', () => {
     expect(escapeXml('')).toBe('');
+  });
+});
+
+// --- toLocalTime ---
+
+describe('toLocalTime', () => {
+  it('converts UTC timestamp to local time in a given timezone', () => {
+    // 2026-02-26T11:30:00.000Z = 08:30 in America/Sao_Paulo (UTC-3)
+    expect(toLocalTime('2026-02-26T11:30:00.000Z', 'America/Sao_Paulo')).toBe(
+      '2026-02-26 08:30',
+    );
+  });
+
+  it('converts UTC midnight correctly across a date boundary', () => {
+    // 2026-02-26T03:00:00.000Z = 2026-02-26T00:00 in America/Sao_Paulo (UTC-3)
+    expect(toLocalTime('2026-02-26T03:00:00.000Z', 'America/Sao_Paulo')).toBe(
+      '2026-02-26 00:00',
+    );
+  });
+
+  it('returns raw string for invalid date input', () => {
+    expect(toLocalTime('not-a-date', 'America/Sao_Paulo')).toBe('not-a-date');
   });
 });
 

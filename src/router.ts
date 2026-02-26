@@ -8,11 +8,11 @@ import { TIMEZONE } from './config.js';
  * Seconds are intentionally omitted — minute precision is sufficient
  * for conversational context; scheduling uses cron/interval values, not these strings.
  */
-function toLocalTime(isoStr: string): string {
+export function toLocalTime(isoStr: string, tz: string = TIMEZONE): string {
   const d = new Date(isoStr);
   if (isNaN(d.getTime())) return isoStr;
   return d.toLocaleString('sv-SE', {
-    timeZone: TIMEZONE,
+    timeZone: tz,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
