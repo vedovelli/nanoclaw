@@ -425,4 +425,12 @@ describe('getRecentExchanges', () => {
     storeMessage({ id: 'b1', chat_jid: 'g4a', sender: 'bot', sender_name: 'Assistant', content: 'a', timestamp: '2024-01-01T00:00:02.000Z', is_from_me: true, is_bot_message: true });
     expect(getRecentExchanges('g4b', 3)).toEqual([]);
   });
+
+  it('drops bot messages that have no preceding user message', () => {
+    storeChatMetadata('g5', '2024-01-01T00:00:00.000Z');
+    storeMessage({ id: 'b1', chat_jid: 'g5', sender: 'bot', sender_name: 'Assistant',
+      content: 'proactive', timestamp: '2024-01-01T00:00:01.000Z',
+      is_from_me: true, is_bot_message: true });
+    expect(getRecentExchanges('g5', 5)).toEqual([]);
+  });
 });

@@ -694,12 +694,14 @@ export function getRecentExchanges(
        JOIN messages u ON (
          u.chat_jid = b.chat_jid
          AND u.is_bot_message = 0
+         AND u.content != '' AND u.content IS NOT NULL
          AND u.timestamp < b.timestamp
          AND u.timestamp = (
            SELECT MAX(timestamp) FROM messages
            WHERE chat_jid = b.chat_jid
              AND is_bot_message = 0
              AND timestamp < b.timestamp
+             AND content != '' AND content IS NOT NULL
          )
        )
        WHERE b.chat_jid = ?
