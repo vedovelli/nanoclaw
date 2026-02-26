@@ -1,4 +1,7 @@
 import { Channel, NewMessage } from './types.js';
+/* ved custom */
+import { storeMessage } from './db.js';
+/* ved custom end */
 
 export function escapeXml(s: string): string {
   if (!s) return '';
@@ -27,14 +30,26 @@ export function formatOutbound(rawText: string): string {
   return text;
 }
 
-export function routeOutbound(
+export async function routeOutbound(
   channels: Channel[],
   jid: string,
   text: string,
 ): Promise<void> {
   const channel = channels.find((c) => c.ownsJid(jid) && c.isConnected());
   if (!channel) throw new Error(`No channel for JID: ${jid}`);
-  return channel.sendMessage(jid, text);
+  await channel.sendMessage(jid, text);
+  /* ved custom */
+  storeMessage({
+    id: `bot-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    chat_jid: jid,
+    sender: 'assistant',
+    sender_name: 'Assistant',
+    content: text,
+    timestamp: Date.now().toString(),
+    is_from_me: true,
+    is_bot_message: true,
+  });
+  /* ved custom end */
 }
 
 export function findChannel(

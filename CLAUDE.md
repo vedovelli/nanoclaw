@@ -8,7 +8,9 @@ Personal Claude assistant. See [README.md](README.md) for philosophy and setup. 
 
 ## Quick Context
 
-Single Node.js process that connects to WhatsApp, routes messages to Claude Agent SDK running in containers (Linux VMs). Each group has isolated filesystem and memory.
+Single Node.js process that routes messages to Claude Agent SDK running in containers (Linux VMs). Each group has isolated filesystem and memory.
+
+**Active channel: Telegram only.** WhatsApp is not used and will never be used in this installation. Do not spend time researching WhatsApp code paths — `src/channels/whatsapp.ts` exists upstream but is irrelevant here.
 
 ## Key Files
 
