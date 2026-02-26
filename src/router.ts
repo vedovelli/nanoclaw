@@ -78,12 +78,12 @@ export async function routeOutbound(
   await channel.sendMessage(jid, text);
   try {
     storeMessage({
-      id: `bot-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
       chat_jid: jid,
       sender: 'assistant',
       sender_name: 'Assistant',
       content: text,
-      timestamp: Date.now().toString(),
+      timestamp: new Date().toISOString(),
       is_from_me: true,
       is_bot_message: true,
     });

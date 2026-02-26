@@ -160,6 +160,22 @@ function makeWarmOutputHandler(
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         await channel.sendMessage(chatJid, text);
+        /* ved custom */
+        try {
+          storeMessage({
+            id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
+            chat_jid: chatJid,
+            sender: 'assistant',
+            sender_name: 'Assistant',
+            content: text,
+            timestamp: new Date().toISOString(),
+            is_from_me: true,
+            is_bot_message: true,
+          });
+        } catch {
+          // persistence is best-effort
+        }
+        /* ved custom end */
         outputSentToUser = true;
       }
       resetIdleTimer();
@@ -297,6 +313,22 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         await channel.sendMessage(chatJid, text);
+        /* ved custom */
+        try {
+          storeMessage({
+            id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
+            chat_jid: chatJid,
+            sender: 'assistant',
+            sender_name: 'Assistant',
+            content: text,
+            timestamp: new Date().toISOString(),
+            is_from_me: true,
+            is_bot_message: true,
+          });
+        } catch {
+          // persistence is best-effort
+        }
+        /* ved custom end */
         outputSentToUser = true;
       }
       // Only reset idle timer on actual results, not session-update markers (result: null)
