@@ -36,3 +36,6 @@ agents-sdk-docs
 artifacts/
 
 .serena
+
+# Git worktrees
+.worktrees/

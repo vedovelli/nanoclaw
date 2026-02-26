@@ -10,6 +10,7 @@ import {
   TELEGRAM_ONLY,
   TRIGGER_PATTERN,
   WARM_POOL_ENABLED,
+  /* ved custom */ RECENT_CONTEXT_PAIRS, /* ved custom end */
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
 import { TelegramChannel } from './channels/telegram.js';
@@ -37,6 +38,7 @@ import {
   setSession,
   storeChatMetadata,
   storeMessage,
+  /* ved custom */ getRecentExchanges, /* ved custom end */
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 /* ved custom */
@@ -158,6 +160,22 @@ function makeWarmOutputHandler(
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         await channel.sendMessage(chatJid, text);
+        /* ved custom */
+        try {
+          storeMessage({
+            id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
+            chat_jid: chatJid,
+            sender: 'assistant',
+            sender_name: 'Assistant',
+            content: text,
+            timestamp: new Date().toISOString(),
+            is_from_me: true,
+            is_bot_message: true,
+          });
+        } catch {
+          // persistence is best-effort
+        }
+        /* ved custom end */
         outputSentToUser = true;
       }
       resetIdleTimer();
@@ -248,7 +266,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(missedMessages);
+  /* ved custom */
+  const recentExchanges = getRecentExchanges(chatJid, RECENT_CONTEXT_PAIRS);
+  /* ved custom end */
+  const prompt = formatMessages(missedMessages, /* ved custom */ recentExchanges /* ved custom end */);
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
@@ -292,6 +313,22 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         await channel.sendMessage(chatJid, text);
+        /* ved custom */
+        try {
+          storeMessage({
+            id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
+            chat_jid: chatJid,
+            sender: 'assistant',
+            sender_name: 'Assistant',
+            content: text,
+            timestamp: new Date().toISOString(),
+            is_from_me: true,
+            is_bot_message: true,
+          });
+        } catch {
+          // persistence is best-effort
+        }
+        /* ved custom end */
         outputSentToUser = true;
       }
       // Only reset idle timer on actual results, not session-update markers (result: null)

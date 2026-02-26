@@ -7,6 +7,7 @@ import {
   getAllChats,
   getMessagesSince,
   getNewMessages,
+  getRecentExchanges,
   getTaskById,
   storeChatMetadata,
   storeMessage,
@@ -386,5 +387,50 @@ describe('task CRUD', () => {
 
     deleteTask('task-3');
     expect(getTaskById('task-3')).toBeUndefined();
+  });
+});
+
+describe('getRecentExchanges', () => {
+  it('returns empty array when no bot messages exist', () => {
+    storeChatMetadata('g1', '2024-01-01T00:00:00.000Z');
+    storeMessage({ id: 'm1', chat_jid: 'g1', sender: 'u1', sender_name: 'User', content: 'hello', timestamp: '2024-01-01T00:00:01.000Z', is_from_me: false, is_bot_message: false });
+    expect(getRecentExchanges('g1', 3)).toEqual([]);
+  });
+
+  it('returns paired exchanges in chronological order', () => {
+    storeChatMetadata('g2', '2024-01-01T00:00:00.000Z');
+    storeMessage({ id: 'u1', chat_jid: 'g2', sender: 'user', sender_name: 'User', content: 'question', timestamp: '2024-01-01T00:00:01.000Z', is_from_me: false, is_bot_message: false });
+    storeMessage({ id: 'b1', chat_jid: 'g2', sender: 'bot', sender_name: 'Assistant', content: 'answer', timestamp: '2024-01-01T00:00:02.000Z', is_from_me: true, is_bot_message: true });
+    const result = getRecentExchanges('g2', 3);
+    expect(result).toEqual([{ userMessage: 'question', botMessage: 'answer' }]);
+  });
+
+  it('respects the limit parameter', () => {
+    storeChatMetadata('g3', '2024-01-01T00:00:00.000Z');
+    for (let i = 1; i <= 5; i++) {
+      const ts = new Date(i * 1000).toISOString();
+      const tsBot = new Date(i * 1000 + 500).toISOString();
+      storeMessage({ id: `u${i}`, chat_jid: 'g3', sender: 'user', sender_name: 'User', content: `q${i}`, timestamp: ts, is_from_me: false, is_bot_message: false });
+      storeMessage({ id: `b${i}`, chat_jid: 'g3', sender: 'bot', sender_name: 'Assistant', content: `a${i}`, timestamp: tsBot, is_from_me: true, is_bot_message: true });
+    }
+    const result = getRecentExchanges('g3', 2);
+    expect(result).toHaveLength(2);
+    expect(result[0].botMessage).toBe('a4');
+    expect(result[1].botMessage).toBe('a5');
+  });
+
+  it('does not cross-contaminate between groups', () => {
+    storeChatMetadata('g4a', '2024-01-01T00:00:00.000Z');
+    storeMessage({ id: 'u1', chat_jid: 'g4a', sender: 'user', sender_name: 'User', content: 'q', timestamp: '2024-01-01T00:00:01.000Z', is_from_me: false, is_bot_message: false });
+    storeMessage({ id: 'b1', chat_jid: 'g4a', sender: 'bot', sender_name: 'Assistant', content: 'a', timestamp: '2024-01-01T00:00:02.000Z', is_from_me: true, is_bot_message: true });
+    expect(getRecentExchanges('g4b', 3)).toEqual([]);
+  });
+
+  it('drops bot messages that have no preceding user message', () => {
+    storeChatMetadata('g5', '2024-01-01T00:00:00.000Z');
+    storeMessage({ id: 'b1', chat_jid: 'g5', sender: 'bot', sender_name: 'Assistant',
+      content: 'proactive', timestamp: '2024-01-01T00:00:01.000Z',
+      is_from_me: true, is_bot_message: true });
+    expect(getRecentExchanges('g5', 5)).toEqual([]);
   });
 });
