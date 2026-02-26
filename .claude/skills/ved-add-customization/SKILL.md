@@ -7,6 +7,11 @@ description: Use before implementing any customization in an upstream NanoClaw f
 
 Run this protocol before and after every change to an upstream file. Upstream files are anything in `src/`, `container/`, `scripts/` that originated from qwibitai/nanoclaw. New files you create from scratch are local-only and skip this protocol.
 
+> **HARD RULE — Pull Requests required:** Every customization MUST be developed on a feature branch and merged via Pull Request. **Never commit customizations directly to `main`.** If no feature branch exists yet, create one before writing any code:
+> ```bash
+> git checkout -b feat/<short-description>
+> ```
+
 ## Step 1: Identify file ownership
 
 Is the target file upstream (came from qwibitai/nanoclaw) or a new local file?
