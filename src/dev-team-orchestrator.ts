@@ -425,26 +425,35 @@ async function checkDevProgress(
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
   // Find a pending task and dispatch the agent
-  const pendingTask = state.tasks.find(t => t.status === 'pending');
+  /* ved custom */
+  // Skip malformed tasks (issue: null or invalid assignee) that may result from
+  // the orchestrator agent outputting example/template lines in its TASK| output
+  const pendingTask = state.tasks.find(
+    t => t.status === 'pending' && t.issue !== null && (t.assignee === 'senior' || t.assignee === 'junior'),
+  );
+  /* ved custom end */
 
   if (pendingTask) {
     const agent = pendingTask.assignee;
     const config = agentConfig(agent);
 
+    /* ved custom */
     const devResult = await runAgent(agent, `
-You need to implement the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
+You need to implement ONLY the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
+Do NOT implement any other issues or features beyond what Issue #${pendingTask.issue} describes.
 
 Steps:
 1. Sync your fork: gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
 2. Clone or cd into your fork working directory
 3. Read the issue: gh issue view ${pendingTask.issue} --repo ${DEVTEAM_UPSTREAM_REPO}
-4. Create a feature branch from main
-5. Implement the feature with multiple atomic commits
+4. Create a feature branch: ${pendingTask.branch || `feature/issue-${pendingTask.issue}`}
+5. Implement ONLY what Issue #${pendingTask.issue} describes, with multiple atomic commits
 6. Push to your fork
 7. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:your-branch --title "..." --body "Closes #${pendingTask.issue}\n\n..."
 
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
+    /* ved custom end */
 
     // Parse PR number from agent output so REVIEW and MERGE can reference it
     const prMatch = devResult.match(/PR_CREATED=(\d+)/);
