@@ -28,6 +28,9 @@ import {
 import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
+/* ved custom */
+import { formatOutbound } from './router.js';
+/* ved custom end */
 import { RegisteredGroup, ScheduledTask } from './types.js';
 
 export interface SchedulerDependencies {
@@ -177,12 +180,16 @@ async function runTask(
         if (streamedOutput.result) {
           result = streamedOutput.result;
           /* ved custom */
-          // Do NOT auto-forward agent output to the channel.
-          // Only explicit send_message MCP tool calls (IPC path) should reach the user.
-          // Auto-forwarding caused internal task outputs (e.g. rate-limit notices,
-          // background task results) to appear in Telegram even when the task was
-          // not triggered by a user message.
+          // Forward task output to the channel UNLESS it looks like a rate-limit notice.
+          // Rate-limit messages (e.g. "You've hit your limit") from background tasks should
+          // not reach the user — they would appear as random spurious notifications.
+          // All other task output (calendar summaries, reminders, reports) is forwarded.
           // Upstream was: await deps.sendMessage(task.chat_jid, streamedOutput.result);
+          const RATE_LIMIT_RE = /you.ve hit your limit|rate.?limit/i;
+          const visibleText = formatOutbound(streamedOutput.result);
+          if (visibleText && !RATE_LIMIT_RE.test(visibleText)) {
+            await deps.sendMessage(task.chat_jid, streamedOutput.result);
+          }
           try {
             storeMessage({
               id: `bot-task-${task.id}-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
