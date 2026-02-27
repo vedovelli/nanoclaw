@@ -28,9 +28,6 @@ import {
 import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
-/* ved custom */
-import { formatOutbound } from './router.js';
-/* ved custom end */
 import { RegisteredGroup, ScheduledTask } from './types.js';
 
 export interface SchedulerDependencies {
@@ -180,14 +177,10 @@ async function runTask(
         if (streamedOutput.result) {
           result = streamedOutput.result;
           /* ved custom */
-          // Forward task output to the channel UNLESS it looks like a rate-limit notice.
-          // Rate-limit messages (e.g. "You've hit your limit") from background tasks should
-          // not reach the user — they would appear as random spurious notifications.
-          // All other task output (calendar summaries, reminders, reports) is forwarded.
-          // Upstream was: await deps.sendMessage(task.chat_jid, streamedOutput.result);
-          const RATE_LIMIT_RE = /you.ve hit your limit|rate.?limit/i;
-          const visibleText = formatOutbound(streamedOutput.result);
-          if (visibleText && !RATE_LIMIT_RE.test(visibleText)) {
+          // Forward task output UNLESS it's a system message (rate-limit, API error).
+          // sanitizeAgentResult (in container-runner.ts) sets isSystemMessage=true when
+          // it transforms the original text, so no text pattern matching needed here.
+          if (!streamedOutput.isSystemMessage) {
             await deps.sendMessage(task.chat_jid, streamedOutput.result);
           }
           try {

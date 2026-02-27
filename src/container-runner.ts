@@ -82,6 +82,7 @@ export interface ContainerOutput {
   result: string | null;
   newSessionId?: string;
   error?: string;
+  /* ved custom */ isSystemMessage?: boolean; /* ved custom end */
 }
 
 interface VolumeMount {
@@ -427,9 +428,11 @@ export async function runContainerAgent(
             resetTimeout();
             // Call onOutput for all markers (including null results)
             // so idle timers start even for "silent" query completions.
-            /* ved custom */ parsed.result = sanitizeAgentResult(
-              parsed.result,
-            ); /* ved custom end */
+            /* ved custom */
+            const originalResult = parsed.result;
+            parsed.result = sanitizeAgentResult(parsed.result);
+            parsed.isSystemMessage = parsed.result !== originalResult;
+            /* ved custom end */
             outputChain = outputChain.then(() => onOutput(parsed));
           } catch (err) {
             logger.warn(
