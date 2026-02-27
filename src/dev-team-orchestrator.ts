@@ -220,7 +220,7 @@ Title: "Sprint #${state.sprint_number} Planning"
 
 Body should include:
 - A brief summary of what the team should focus on this sprint
-- A call for Carlos and Ana to propose features
+- A call for @${DEVTEAM_SENIOR_GITHUB_USER} and @${DEVTEAM_JUNIOR_GITHUB_USER} to propose features
 - Reference to previous sprints if sprint_number > 1
 
 Use: gh issue create --repo ${DEVTEAM_UPSTREAM_REPO} --title "Sprint #${state.sprint_number} Planning" --body "..."
