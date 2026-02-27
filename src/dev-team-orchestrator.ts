@@ -1,8 +1,9 @@
 /* ved custom */
 import fs from 'fs';
 import path from 'path';
-import { ChildProcess } from 'child_process';
+import { ChildProcess, exec } from 'child_process';
 import { runContainerAgent } from './container-runner.js';
+import { stopContainer } from './container-runtime.js';
 import {
   DEVTEAM_UPSTREAM_REPO,
   DEVTEAM_SENIOR_GITHUB_TOKEN,
@@ -130,6 +131,20 @@ async function runAgent(
 
   const model = agent === 'orchestrator' ? 'sonnet' : 'haiku';
 
+  /* ved custom */
+  // Capture result early via streaming output callback, then kill the container.
+  // Agents keep their process alive after printing results (MCP connections etc),
+  // which would block the orchestrator indefinitely waiting for container.on('close').
+  let capturedResult: string | null = null;
+  let capturedContainerName: string | undefined;
+  let capturedProc: ChildProcess | undefined;
+
+  const wrappedOnProcess = (proc: ChildProcess, containerName: string) => {
+    capturedProc = proc;
+    capturedContainerName = containerName;
+    onProcess(proc, containerName);
+  };
+
   const output = await runContainerAgent(
     group,
     {
@@ -145,10 +160,22 @@ async function runAgent(
         GH_TOKEN: config.token,
       },
     },
-    onProcess,
+    wrappedOnProcess,
+    async (streamOutput) => {
+      if (streamOutput.result !== null && capturedResult === null) {
+        capturedResult = streamOutput.result;
+        // Kill the container immediately — we have the result we need
+        if (capturedContainerName) {
+          exec(stopContainer(capturedContainerName), { timeout: 5000 }, () => {
+            capturedProc?.kill('SIGKILL');
+          });
+        }
+      }
+    },
   );
+  /* ved custom end */
 
-  return output.result || output.error || 'No output';
+  return capturedResult ?? output.result ?? output.error ?? 'No output';
 }
 
 async function setupForks(
