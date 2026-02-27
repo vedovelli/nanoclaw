@@ -11,6 +11,14 @@ const envConfig = readEnvFile([
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_ONLY',
   'WARM_POOL_ENABLED',
+  /* ved custom */
+  'DEVTEAM_ENABLED',
+  'DEVTEAM_UPSTREAM_REPO',
+  'DEVTEAM_SENIOR_GITHUB_TOKEN',
+  'DEVTEAM_SENIOR_GITHUB_USER',
+  'DEVTEAM_JUNIOR_GITHUB_TOKEN',
+  'DEVTEAM_JUNIOR_GITHUB_USER',
+  /* ved custom end */
 ]);
 
 export const ASSISTANT_NAME =
@@ -81,12 +89,18 @@ export const WARM_POOL_ENABLED =
 
 /* ved custom */
 // Dev Team Simulation
-export const DEVTEAM_ENABLED = process.env.DEVTEAM_ENABLED === 'true';
-export const DEVTEAM_UPSTREAM_REPO = process.env.DEVTEAM_UPSTREAM_REPO || '';
-export const DEVTEAM_SENIOR_GITHUB_TOKEN = process.env.DEVTEAM_SENIOR_GITHUB_TOKEN || '';
-export const DEVTEAM_SENIOR_GITHUB_USER = process.env.DEVTEAM_SENIOR_GITHUB_USER || '';
-export const DEVTEAM_JUNIOR_GITHUB_TOKEN = process.env.DEVTEAM_JUNIOR_GITHUB_TOKEN || '';
-export const DEVTEAM_JUNIOR_GITHUB_USER = process.env.DEVTEAM_JUNIOR_GITHUB_USER || '';
+export const DEVTEAM_ENABLED =
+  (process.env.DEVTEAM_ENABLED || envConfig.DEVTEAM_ENABLED) === 'true';
+export const DEVTEAM_UPSTREAM_REPO =
+  process.env.DEVTEAM_UPSTREAM_REPO || envConfig.DEVTEAM_UPSTREAM_REPO || '';
+export const DEVTEAM_SENIOR_GITHUB_TOKEN =
+  process.env.DEVTEAM_SENIOR_GITHUB_TOKEN || envConfig.DEVTEAM_SENIOR_GITHUB_TOKEN || '';
+export const DEVTEAM_SENIOR_GITHUB_USER =
+  process.env.DEVTEAM_SENIOR_GITHUB_USER || envConfig.DEVTEAM_SENIOR_GITHUB_USER || '';
+export const DEVTEAM_JUNIOR_GITHUB_TOKEN =
+  process.env.DEVTEAM_JUNIOR_GITHUB_TOKEN || envConfig.DEVTEAM_JUNIOR_GITHUB_TOKEN || '';
+export const DEVTEAM_JUNIOR_GITHUB_USER =
+  process.env.DEVTEAM_JUNIOR_GITHUB_USER || envConfig.DEVTEAM_JUNIOR_GITHUB_USER || '';
 /* ved custom end */
 
 /* ved custom */
