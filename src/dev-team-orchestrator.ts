@@ -123,7 +123,7 @@ async function runAgent(
 
   const fullPrompt = `${systemPrompt}\n\n---\n\n## Current Task\n\n${prompt}`;
 
-  const model = agent === 'orchestrator' ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+  const model = agent === 'orchestrator' ? 'sonnet' : 'haiku';
 
   const output = await runContainerAgent(
     group,
@@ -334,7 +334,7 @@ async function checkDevProgress(
     const agent = pendingTask.assignee;
     const config = agentConfig(agent);
 
-    await runAgent(agent, `
+    const devResult = await runAgent(agent, `
 You need to implement the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
 
 Steps:
@@ -349,6 +349,11 @@ Steps:
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
 
+    // Parse PR number from agent output so REVIEW and MERGE can reference it
+    const prMatch = devResult.match(/PR_CREATED=(\d+)/);
+    if (prMatch) {
+      pendingTask.pr = parseInt(prMatch[1], 10);
+    }
     pendingTask.status = 'pr_created';
     state.next_action_at = randomDelay(10, 30);
     writeState(state);

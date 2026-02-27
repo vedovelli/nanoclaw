@@ -1,5 +1,7 @@
 import fs from 'fs';
+/* ved custom */
 import path from 'path';
+/* ved custom end */
 
 import { Bot, InputFile } from 'grammy';
 
