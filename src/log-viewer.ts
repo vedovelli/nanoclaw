@@ -1,7 +1,6 @@
 import fs from 'node:fs';
-import http from 'node:http';
+import http, { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
-import { IncomingMessage, ServerResponse } from 'node:http';
 
 import { LOG_VIEWER_ENABLED, LOG_VIEWER_PORT } from './config.js';
 import { logger } from './logger.js';
@@ -39,8 +38,11 @@ function tailFile(filePath: string, onLine: (line: string) => void): () => void 
       const len = stat.size - pos;
       const buf = Buffer.allocUnsafe(len);
       const fd = fs.openSync(filePath, 'r');
-      fs.readSync(fd, buf, 0, len, pos);
-      fs.closeSync(fd);
+      try {
+        fs.readSync(fd, buf, 0, len, pos);
+      } finally {
+        fs.closeSync(fd);
+      }
       pos = stat.size;
       for (const line of buf.toString('utf-8').split('\n')) {
         if (line.length > 0) onLine(line);
@@ -50,11 +52,15 @@ function tailFile(filePath: string, onLine: (line: string) => void): () => void 
     }
   }
 
-  try {
-    watcher = fs.watch(filePath, read);
-  } catch {
-    // file doesn't exist yet — no watcher
+  function tryWatch(): void {
+    try {
+      watcher = fs.watch(filePath, read);
+    } catch {
+      // File doesn't exist yet — retry in 5 seconds
+      setTimeout(tryWatch, 5000);
+    }
   }
+  tryWatch();
 
   return () => {
     if (watcher) {
@@ -85,15 +91,16 @@ function handleSSE(
   }
 
   // Stream new lines as they arrive
-  const stop = tailFile(logFile, (line) => {
+  let stop: (() => void) | undefined;
+  stop = tailFile(logFile, (line) => {
     try {
       res.write(`data: ${JSON.stringify(line)}\n\n`);
     } catch {
-      stop();
+      stop?.();
     }
   });
 
-  req.on('close', stop);
+  req.on('close', () => stop?.());
 }
 
 const HTML = `<!DOCTYPE html>
