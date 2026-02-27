@@ -13,6 +13,7 @@ const envConfig = readEnvFile([
   'WARM_POOL_ENABLED',
   /* ved custom */
   'DEVTEAM_ENABLED',
+  'DEVTEAM_FAST_MODE',
   'DEVTEAM_UPSTREAM_REPO',
   'DEVTEAM_SENIOR_GITHUB_TOKEN',
   'DEVTEAM_SENIOR_GITHUB_USER',
@@ -91,6 +92,8 @@ export const WARM_POOL_ENABLED =
 // Dev Team Simulation
 export const DEVTEAM_ENABLED =
   (process.env.DEVTEAM_ENABLED || envConfig.DEVTEAM_ENABLED) === 'true';
+export const DEVTEAM_FAST_MODE =
+  (process.env.DEVTEAM_FAST_MODE || envConfig.DEVTEAM_FAST_MODE) === 'true';
 export const DEVTEAM_UPSTREAM_REPO =
   process.env.DEVTEAM_UPSTREAM_REPO || envConfig.DEVTEAM_UPSTREAM_REPO || '';
 export const DEVTEAM_SENIOR_GITHUB_TOKEN =

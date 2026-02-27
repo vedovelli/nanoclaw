@@ -6,6 +6,7 @@ import { runContainerAgent } from './container-runner.js';
 import { stopContainer } from './container-runtime.js';
 import {
   DEVTEAM_UPSTREAM_REPO,
+  DEVTEAM_FAST_MODE,
   DEVTEAM_SENIOR_GITHUB_TOKEN,
   DEVTEAM_SENIOR_GITHUB_USER,
   DEVTEAM_JUNIOR_GITHUB_TOKEN,
@@ -49,7 +50,11 @@ function writeState(state: SprintState): void {
 }
 
 function randomDelay(minMinutes: number, maxMinutes: number): string {
-  const delayMs = (minMinutes + Math.random() * (maxMinutes - minMinutes)) * 60 * 1000;
+  /* ved custom */
+  // DEVTEAM_FAST_MODE=true: treat "minutes" as seconds for rapid debugging
+  const multiplier = DEVTEAM_FAST_MODE ? 1000 : 60 * 1000;
+  /* ved custom end */
+  const delayMs = (minMinutes + Math.random() * (maxMinutes - minMinutes)) * multiplier;
   return new Date(Date.now() + delayMs).toISOString();
 }
 
