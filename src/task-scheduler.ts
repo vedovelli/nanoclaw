@@ -190,6 +190,8 @@ async function runTask(
         result: null,
         error,
       });
+      const nextRun = new Date(Date.now() + parseInt(task.schedule_value, 10)).toISOString();
+      updateTaskAfterRun(task.id, nextRun, `Error: ${error.slice(0, 150)}`);
     }
     return;
   }
