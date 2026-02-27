@@ -172,9 +172,13 @@ Output the fork URL as: FORK_URL=<url>
 `, group, chatJid, onProcess);
 
     const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
-    state.senior_fork = match
-      ? match[1].trim()
-      : `https://github.com/${DEVTEAM_SENIOR_GITHUB_USER}/${repoBaseName}`;
+    /* ved custom */
+    if (!match) {
+      logger.error({ result }, 'DevTeam: senior fork setup failed — no FORK_URL in output');
+      throw new Error(`Senior fork setup failed. Output: ${result.slice(0, 500)}`);
+    }
+    state.senior_fork = match[1].trim();
+    /* ved custom end */
   }
 
   if (!state.junior_fork) {
@@ -189,9 +193,13 @@ Output the fork URL as: FORK_URL=<url>
 `, group, chatJid, onProcess);
 
     const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
-    state.junior_fork = match
-      ? match[1].trim()
-      : `https://github.com/${DEVTEAM_JUNIOR_GITHUB_USER}/${repoBaseName}`;
+    /* ved custom */
+    if (!match) {
+      logger.error({ result }, 'DevTeam: junior fork setup failed — no FORK_URL in output');
+      throw new Error(`Junior fork setup failed. Output: ${result.slice(0, 500)}`);
+    }
+    state.junior_fork = match[1].trim();
+    /* ved custom end */
   }
 
   state.next_action_at = randomDelay(1, 2);
