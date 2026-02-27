@@ -5,7 +5,8 @@ set -euo pipefail
 # Creates a new GitHub repo with React + TanStack + MSW + Tailwind scaffold
 
 REPO_NAME="${1:?Usage: $0 <repo-name>}"
-REPO_DIR="/tmp/devteam-scaffold-${REPO_NAME}"
+REPO_BASENAME="${REPO_NAME##*/}"  # strip optional "user/" prefix
+REPO_DIR="$(mktemp -d)/devteam-scaffold-${REPO_BASENAME}"
 
 echo "Creating scaffold in ${REPO_DIR}..."
 
