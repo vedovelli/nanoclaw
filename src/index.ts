@@ -12,6 +12,12 @@ import {
   WARM_POOL_ENABLED,
   /* ved custom */ RECENT_CONTEXT_PAIRS, /* ved custom end */
 } from './config.js';
+/* ved custom */
+import {
+  DEVTEAM_ENABLED,
+  DEVTEAM_UPSTREAM_REPO,
+} from './config.js';
+/* ved custom end */
 import { WhatsAppChannel } from './channels/whatsapp.js';
 import { TelegramChannel } from './channels/telegram.js';
 import {
@@ -39,6 +45,7 @@ import {
   storeChatMetadata,
   storeMessage,
   /* ved custom */ getRecentExchanges, /* ved custom end */
+  /* ved custom */ createTask, /* ved custom end */
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 /* ved custom */
@@ -609,6 +616,40 @@ function ensureContainerSystemRunning(): void {
   cleanupOrphans();
 }
 
+/* ved custom */
+async function initDevTeam(registeredGroups: Record<string, RegisteredGroup>): Promise<void> {
+  if (!DEVTEAM_ENABLED || !DEVTEAM_UPSTREAM_REPO) return;
+
+  const allTasks = getAllTasks();
+  const existing = allTasks.find((t) => t.id === 'devteam-orchestrator');
+  if (existing) return;
+
+  // Find the background group's JID
+  const backgroundJid = Object.keys(registeredGroups).find(
+    (jid) => registeredGroups[jid].folder === 'background',
+  );
+  if (!backgroundJid) {
+    logger.warn('DevTeam: no background group found — orchestrator task not created');
+    return;
+  }
+
+  createTask({
+    id: 'devteam-orchestrator',
+    group_folder: 'background',
+    chat_jid: backgroundJid,
+    prompt: '__DEVTEAM_ORCHESTRATOR__',
+    schedule_type: 'interval',
+    schedule_value: '300000',
+    context_mode: 'isolated',
+    next_run: new Date().toISOString(),
+    status: 'active',
+    created_at: new Date().toISOString(),
+  });
+
+  logger.info('DevTeam orchestrator scheduled task created');
+}
+/* ved custom end */
+
 async function main(): Promise<void> {
   ensureContainerSystemRunning();
   initDatabase();
@@ -681,6 +722,9 @@ async function main(): Promise<void> {
       if (text) await channel.sendMessage(jid, text);
     },
   });
+  /* ved custom */
+  await initDevTeam(registeredGroups);
+  /* ved custom end */
   /* ved custom */ startFileSender({
     channels,
     registeredGroups: () => registeredGroups,

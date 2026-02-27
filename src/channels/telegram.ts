@@ -1,4 +1,7 @@
 import fs from 'fs';
+/* ved custom */
+import path from 'path';
+/* ved custom end */
 
 import { Bot, InputFile } from 'grammy';
 
@@ -52,6 +55,53 @@ export class TelegramChannel implements Channel {
     this.bot.command('ping', (ctx) => {
       ctx.reply(`${ASSISTANT_NAME} is online.`);
     });
+
+    /* ved custom */
+    // Dev Team simulation control
+    this.bot.command('devteam', async (ctx) => {
+      const args = ((ctx.match as string) || '').trim().toLowerCase();
+      const stateFile = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
+
+      if (args === 'stop') {
+        try {
+          const raw = fs.readFileSync(stateFile, 'utf-8');
+          const state = JSON.parse(raw);
+          state.paused = true;
+          fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+          await ctx.reply('Dev team paused. Use /devteam start to resume.');
+        } catch {
+          await ctx.reply('No active dev team state found.');
+        }
+      } else if (args === 'start') {
+        try {
+          const raw = fs.readFileSync(stateFile, 'utf-8');
+          const state = JSON.parse(raw);
+          state.paused = false;
+          fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+          await ctx.reply('Dev team resumed.');
+        } catch {
+          await ctx.reply('No dev team state found. The orchestrator will create one on first run.');
+        }
+      } else if (args === 'status') {
+        try {
+          const raw = fs.readFileSync(stateFile, 'utf-8');
+          const state = JSON.parse(raw);
+          const lines = [
+            `Sprint: #${state.sprint_number}`,
+            `State: ${state.state}`,
+            `Paused: ${state.paused ? 'Yes' : 'No'}`,
+            `Tasks: ${(state.tasks || []).length}`,
+            `Next action: ${state.next_action_at || 'N/A'}`,
+          ];
+          await ctx.reply(lines.join('\n'));
+        } catch {
+          await ctx.reply('No active dev team state found.');
+        }
+      } else {
+        await ctx.reply('Usage: /devteam stop | start | status');
+      }
+    });
+    /* ved custom end */
 
     this.bot.on('message:text', async (ctx) => {
       // Skip commands

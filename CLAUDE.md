@@ -43,6 +43,12 @@ Single Node.js process that routes messages to Claude Agent SDK running in conta
 | `/ved-sync-upstream` | Pull upstream changes into a branch + PR for human review before merging |
 | `/ved-add-customization` | Protocol checklist before customizing any upstream file — markers, tracker, build |
 
+## Mandatory Customization Protocol — HARD REQUIREMENT
+
+**Any development task that modifies files in `src/`, `container/`, or `scripts/` MUST use the `/ved-add-customization` skill. This is non-negotiable.**
+
+Before writing or editing any code in upstream files, invoke `/ved-add-customization` first. This skill enforces the `ved custom` marker protocol, checks the customization tracker, and verifies the build. No exceptions — even "quick fixes" or "small changes" must go through this skill.
+
 ## Code Traversal and Editing — HARD REQUIREMENT
 
 **You MUST use the Serena MCP tools for all code reading, traversal, and editing tasks. This is non-negotiable.**

@@ -12,6 +12,20 @@ Run this protocol before and after every change to an upstream file. Upstream fi
 > git checkout -b feat/<short-description>
 > ```
 
+## Step 0: Establish baseline
+
+Before touching any code, capture the current state so regressions are detectable at the end:
+
+```bash
+npm run build && npm run test
+```
+
+Record the results:
+- **Build:** passed / failed (note any pre-existing errors)
+- **Tests:** N passed, N failed (note any pre-existing failures by name)
+
+If the baseline itself is broken, surface that to the user before proceeding — don't let pre-existing failures get attributed to your changes later.
+
 ## Step 1: Identify file ownership
 
 Is the target file upstream (came from qwibitai/nanoclaw) or a new local file?
@@ -78,13 +92,17 @@ Include for each new customization:
 - **Why** — why this customization exists (the business reason)
 - **Re-apply difficulty** — easy / medium / hard (how hard to restore after a future merge conflict)
 
-## Step 6: Build check
+## Step 6: Build and test check
 
 ```bash
-npm run build
+npm run build && npm run test
 ```
 
-Fix any TypeScript errors before proceeding. Never leave the session with a broken build.
+Compare results against the Step 0 baseline:
+- Build must pass (no new errors)
+- Test failures must not exceed the baseline (no new failures introduced)
+
+Fix any regressions before proceeding. Never leave the session with a broken build.
 
 ## Step 7: Should this be a skill?
 
