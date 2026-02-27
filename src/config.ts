@@ -118,8 +118,9 @@ export const RECENT_CONTEXT_PAIRS = 3;
 /* ved custom */
 export const LOG_VIEWER_ENABLED =
   (process.env.LOG_VIEWER_ENABLED || envConfig.LOG_VIEWER_ENABLED) === 'true';
-export const LOG_VIEWER_PORT = parseInt(
-  process.env.LOG_VIEWER_PORT || envConfig.LOG_VIEWER_PORT || '4242',
-  10,
-);
+export const LOG_VIEWER_PORT =
+  parseInt(
+    process.env.LOG_VIEWER_PORT || envConfig.LOG_VIEWER_PORT || '4242',
+    10,
+  ) || 4242;
 /* ved custom end */
