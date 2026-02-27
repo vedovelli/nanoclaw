@@ -80,6 +80,16 @@ export const WARM_POOL_ENABLED =
   'false';
 
 /* ved custom */
+// Dev Team Simulation
+export const DEVTEAM_ENABLED = process.env.DEVTEAM_ENABLED === 'true';
+export const DEVTEAM_UPSTREAM_REPO = process.env.DEVTEAM_UPSTREAM_REPO || '';
+export const DEVTEAM_SENIOR_GITHUB_TOKEN = process.env.DEVTEAM_SENIOR_GITHUB_TOKEN || '';
+export const DEVTEAM_SENIOR_GITHUB_USER = process.env.DEVTEAM_SENIOR_GITHUB_USER || '';
+export const DEVTEAM_JUNIOR_GITHUB_TOKEN = process.env.DEVTEAM_JUNIOR_GITHUB_TOKEN || '';
+export const DEVTEAM_JUNIOR_GITHUB_USER = process.env.DEVTEAM_JUNIOR_GITHUB_USER || '';
+/* ved custom end */
+
+/* ved custom */
 /** Number of recent user+bot exchange pairs to inject into each agent prompt. */
 export const RECENT_CONTEXT_PAIRS = 3;
 /* ved custom end */
