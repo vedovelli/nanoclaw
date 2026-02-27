@@ -52,6 +52,9 @@ import { GroupQueue } from './group-queue.js';
 import { WarmPool } from './warm-pool.js';
 import { startFileSender } from './file-sender.js';
 /* ved custom end */
+/* ved custom */
+import { startLogViewer } from './log-viewer.js';
+/* ved custom end */
 import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
@@ -724,6 +727,9 @@ async function main(): Promise<void> {
   });
   /* ved custom */
   await initDevTeam(registeredGroups);
+  /* ved custom end */
+  /* ved custom */
+  startLogViewer();
   /* ved custom end */
   /* ved custom */ startFileSender({
     channels,
