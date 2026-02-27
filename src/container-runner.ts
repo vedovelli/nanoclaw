@@ -373,7 +373,11 @@ export async function runContainerAgent(
     let stderrTruncated = false;
 
     // Pass secrets via stdin (never written to disk or mounted as files)
-    input.secrets = readSecrets();
+    // Merge: caller-supplied secrets override readSecrets() values (e.g. per-agent GH_TOKEN)
+    /* ved custom */
+    const callerSecrets = input.secrets || {};
+    input.secrets = { ...readSecrets(), ...callerSecrets };
+    /* ved custom end */
     // Propagate notifyJid from group config so background tasks can route messages
     if (!input.notifyJid && group.containerConfig?.notifyJid) {
       input.notifyJid = group.containerConfig.notifyJid;
