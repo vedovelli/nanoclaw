@@ -9,8 +9,8 @@ REPO_DIR="/tmp/devteam-scaffold-${REPO_NAME}"
 
 echo "Creating scaffold in ${REPO_DIR}..."
 
-# Create project with Vite
-npm create vite@latest "${REPO_DIR}" -- --template react-ts
+# Create project with Vite (pin v5 — v6+ auto-starts the dev server)
+npm create vite@5 "${REPO_DIR}" -- --template react-ts
 cd "${REPO_DIR}"
 
 # Install TanStack suite
