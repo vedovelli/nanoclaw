@@ -82,6 +82,11 @@ export async function runDevTeamOrchestrator(
     return `Next action at ${state.next_action_at}. Waiting.`;
   }
 
+  // One-time setup: fork the upstream repo from each agent account if not done yet
+  if (!state.senior_fork || !state.junior_fork) {
+    return await setupForks(state, group, chatJid, onProcess);
+  }
+
   logger.info({ state: state.state, sprint: state.sprint_number }, 'DevTeam orchestrator tick');
 
   switch (state.state) {
@@ -144,6 +149,54 @@ async function runAgent(
   );
 
   return output.result || output.error || 'No output';
+}
+
+async function setupForks(
+  state: SprintState,
+  group: RegisteredGroup,
+  chatJid: string,
+  onProcess: (proc: ChildProcess, containerName: string) => void,
+): Promise<string> {
+  const repoBaseName = DEVTEAM_UPSTREAM_REPO.split('/')[1];
+  logger.info('DevTeam: setting up forks for senior and junior agents');
+
+  if (!state.senior_fork) {
+    const result = await runAgent('senior', `
+Fork the upstream repo ${DEVTEAM_UPSTREAM_REPO} into your account if it doesn't exist yet:
+  gh repo fork ${DEVTEAM_UPSTREAM_REPO} --clone=false --remote=false
+
+Then confirm the fork URL by running:
+  gh repo view ${DEVTEAM_SENIOR_GITHUB_USER}/${repoBaseName} --json url -q .url
+
+Output the fork URL as: FORK_URL=<url>
+`, group, chatJid, onProcess);
+
+    const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
+    state.senior_fork = match
+      ? match[1].trim()
+      : `https://github.com/${DEVTEAM_SENIOR_GITHUB_USER}/${repoBaseName}`;
+  }
+
+  if (!state.junior_fork) {
+    const result = await runAgent('junior', `
+Fork the upstream repo ${DEVTEAM_UPSTREAM_REPO} into your account if it doesn't exist yet:
+  gh repo fork ${DEVTEAM_UPSTREAM_REPO} --clone=false --remote=false
+
+Then confirm the fork URL by running:
+  gh repo view ${DEVTEAM_JUNIOR_GITHUB_USER}/${repoBaseName} --json url -q .url
+
+Output the fork URL as: FORK_URL=<url>
+`, group, chatJid, onProcess);
+
+    const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
+    state.junior_fork = match
+      ? match[1].trim()
+      : `https://github.com/${DEVTEAM_JUNIOR_GITHUB_USER}/${repoBaseName}`;
+  }
+
+  state.next_action_at = randomDelay(1, 2);
+  writeState(state);
+  return `Forks ready — senior: ${state.senior_fork} | junior: ${state.junior_fork}`;
 }
 
 async function startNewSprint(
