@@ -2,6 +2,9 @@ import fs from 'fs';
 /* ved custom */
 import path from 'path';
 /* ved custom end */
+/* ved custom */
+import { updateTaskAfterRun } from '../db.js';
+/* ved custom end */
 
 import { Bot, InputFile } from 'grammy';
 
@@ -97,8 +100,23 @@ export class TelegramChannel implements Channel {
         } catch {
           await ctx.reply('No active dev team state found.');
         }
+      } else if (args === 'run') {
+        try {
+          const raw = fs.readFileSync(stateFile, 'utf-8');
+          const state = JSON.parse(raw);
+          if (state.paused) {
+            await ctx.reply('Dev team is paused. Use /devteam start first.');
+          } else {
+            state.next_action_at = null;
+            fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+            updateTaskAfterRun('devteam-orchestrator', new Date().toISOString(), 'triggered by /devteam run');
+            await ctx.reply('Orchestrator triggered. Running on next scheduler tick (~30s).');
+          }
+        } catch {
+          await ctx.reply('No dev team state found.');
+        }
       } else {
-        await ctx.reply('Usage: /devteam stop | start | status');
+        await ctx.reply('Usage: /devteam stop | start | status | run');
       }
     });
     /* ved custom end */
