@@ -320,7 +320,11 @@ async function continueDebate(
   }
 
   // Alternate between Ana and Carlos
-  const agent: 'senior' | 'junior' = state.debate_round % 2 === 0 ? 'senior' : 'junior';
+  // Carlos opens debate in round 1 (startDebate). Round 2 = Ana, 3 = Carlos, 4 = Ana.
+  // Even rounds → junior (Ana), odd rounds → senior (Carlos).
+  /* ved custom */
+  const agent: 'senior' | 'junior' = state.debate_round % 2 === 0 ? 'junior' : 'senior';
+  /* ved custom end */
 
   // Read the issue comments to understand context
   await runAgent(agent, `
