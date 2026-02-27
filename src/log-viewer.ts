@@ -52,7 +52,10 @@ function tailFile(filePath: string, onLine: (line: string) => void): () => void 
     }
   }
 
+  let stopped = false;
+
   function tryWatch(): void {
+    if (stopped) return;   // connection already closed, don't create watcher
     try {
       watcher = fs.watch(filePath, read);
     } catch {
@@ -63,6 +66,7 @@ function tailFile(filePath: string, onLine: (line: string) => void): () => void 
   tryWatch();
 
   return () => {
+    stopped = true;   // prevent any pending retry from creating a new watcher
     if (watcher) {
       try {
         watcher.close();
