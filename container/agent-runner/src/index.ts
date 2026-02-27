@@ -29,6 +29,7 @@ interface ContainerInput {
   /* ved custom */ notifyJid?: string; /* ved custom end */
   assistantName?: string;
   secrets?: Record<string, string>;
+  /* ved custom */ model?: string; /* ved custom end */
 }
 
 interface ContainerOutput {
@@ -418,6 +419,7 @@ async function runQuery(
   for await (const message of query({
     prompt: stream,
     options: {
+      /* ved custom */ model: containerInput.model, /* ved custom end */ // undefined = SDK default (Opus); override for Haiku/Sonnet
       cwd: '/workspace/group',
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,

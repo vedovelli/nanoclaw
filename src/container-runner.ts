@@ -75,6 +75,7 @@ export interface ContainerInput {
   /* ved custom */ notifyJid?: string; /* ved custom end */
   assistantName?: string;
   secrets?: Record<string, string>;
+  /* ved custom */ model?: string; /* ved custom end */
 }
 
 export interface ContainerOutput {
