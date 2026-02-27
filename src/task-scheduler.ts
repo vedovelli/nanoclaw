@@ -29,6 +29,9 @@ import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
 import { RegisteredGroup, ScheduledTask } from './types.js';
+/* ved custom */
+import { runDevTeamOrchestrator } from './dev-team-orchestrator.js';
+/* ved custom end */
 
 export interface SchedulerDependencies {
   registeredGroups: () => Record<string, RegisteredGroup>;
@@ -157,6 +160,40 @@ async function runTask(
       deps.queue.closeStdin(task.chat_jid);
     }, TASK_CLOSE_DELAY_MS);
   };
+
+  /* ved custom */
+  // Intercept devteam orchestrator task — runs state machine directly
+  if (task.prompt === '__DEVTEAM_ORCHESTRATOR__') {
+    try {
+      const result = await runDevTeamOrchestrator(
+        group,
+        task.chat_jid,
+        (proc, containerName) => deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
+      );
+      logTaskRun({
+        task_id: task.id,
+        run_at: new Date().toISOString(),
+        duration_ms: Date.now() - startTime,
+        status: 'success',
+        result: result.slice(0, 200),
+        error: null,
+      });
+      const nextRun = new Date(Date.now() + parseInt(task.schedule_value, 10)).toISOString();
+      updateTaskAfterRun(task.id, nextRun, result.slice(0, 200));
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      logTaskRun({
+        task_id: task.id,
+        run_at: new Date().toISOString(),
+        duration_ms: Date.now() - startTime,
+        status: 'error',
+        result: null,
+        error,
+      });
+    }
+    return;
+  }
+  /* ved custom end */
 
   try {
     const output = await runContainerAgent(
