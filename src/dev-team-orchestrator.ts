@@ -114,8 +114,7 @@ export async function runDevTeamOrchestrator(
     case 'REVIEW':
       return await processReview(state, group, chatJid, onProcess);
     case 'AUTHOR_FIXES':
-      await authorFixTask(state, group, chatJid, onProcess);
-      return 'Author is addressing review feedback.';
+      return await authorFixTask(state, group, chatJid, onProcess);
     case 'MERGE':
       return await processMerge(state, group, chatJid, onProcess);
     case 'COMPLETE':
@@ -581,24 +580,26 @@ async function authorFixTask(
   group: RegisteredGroup,
   chatJid: string,
   onProcess: (proc: ChildProcess, containerName: string) => void,
-): Promise<void> {
-  // Find the task currently under review
-  const task = state.tasks.find(t => t.issue === state.task_under_review);
+): Promise<string> {
+  // Find the task currently under review — null guard prevents wrong match when both are null
+  const task = state.tasks.find(t => t.issue !== null && t.issue === state.task_under_review);
 
   if (!task || !task.pr) {
     // Nothing to fix — fall back to REVIEW
+    console.warn('[authorFixTask] No task or PR found for task_under_review=%s; falling back to REVIEW', state.task_under_review);
     state.state = 'REVIEW';
     state.task_under_review = null;
     state.next_action_at = randomDelay(3, 5);
     writeState(state);
-    return;
+    return 'No task or PR found to fix; returned to REVIEW.';
   }
 
   // The PR author is the task's assignee
   const author = task.assignee;
   const config = agentConfig(author);
 
-  await runAgent(author, `
+  try {
+    await runAgent(author, `
 You are the author of PR #${task.pr} for Issue #${task.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
 
 A reviewer has requested changes on your PR. Your job is to read their feedback and push fixes.
@@ -615,12 +616,23 @@ Steps:
 
 Output: FIXES_PUSHED=true
 `, group, chatJid, onProcess);
+  } catch (err) {
+    console.error('[authorFixTask] runAgent failed for PR #%s: %s', task.pr, err);
+    // Retry after a short delay rather than leaving state stuck in AUTHOR_FIXES
+    state.next_action_at = randomDelay(5, 15);
+    writeState(state);
+    return `Author fix agent failed for PR #${task.pr}; will retry.`;
+  }
+
+  // Reset review_round so the next review cycle starts fresh (not biased by previous task's rounds)
+  state.review_round = 0;
 
   // Transition back to REVIEW so the reviewer can re-evaluate
   state.state = 'REVIEW';
   state.task_under_review = null;
   state.next_action_at = randomDelay(5, 15);
   writeState(state);
+  return `Author pushed fixes for PR #${task.pr}; returning to REVIEW.`;
 }
 
 async function processMerge(
