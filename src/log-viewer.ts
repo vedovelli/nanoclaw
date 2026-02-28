@@ -7,7 +7,6 @@ import { logger } from './logger.js';
 
 const LOG_DIR = path.join(process.cwd(), 'logs');
 const MAIN_LOG = path.join(LOG_DIR, 'nanoclaw.log');
-const ERROR_LOG = path.join(LOG_DIR, 'nanoclaw.error.log');
 const BACKFILL_LINES = 200;
 
 function readLastLines(filePath: string, n: number): string[] {
@@ -147,7 +146,6 @@ const HTML = `<!DOCTYPE html>
   <header>
     <h1>NanoClaw Live Logs</h1>
     <span class="status" id="status-main">main: connecting\u2026</span>
-    <span class="status" id="status-error">error: connecting\u2026</span>
   </header>
   <div class="panels">
     <div class="panel">
@@ -155,8 +153,8 @@ const HTML = `<!DOCTYPE html>
       <div class="panel-content" id="panel-main"></div>
     </div>
     <div class="panel">
-      <div class="panel-header">nanoclaw.error.log</div>
-      <div class="panel-content" id="panel-error"></div>
+      <div class="panel-header">Dev Visibility</div>
+      <iframe src="https://devvis.com.br/admin" style="flex:1;border:none;width:100%;height:100%;"></iframe>
     </div>
   </div>
   <script>
@@ -199,7 +197,6 @@ const HTML = `<!DOCTYPE html>
     }
 
     connect('/stream/main', 'panel-main', 'status-main');
-    connect('/stream/error', 'panel-error', 'status-error');
   </script>
 </body>
 </html>`;
@@ -216,7 +213,6 @@ export function startLogViewer(): void {
     (req: IncomingMessage, res: ServerResponse) => {
       const url = req.url ?? '/';
       if (url === '/stream/main') return handleSSE(req, res, MAIN_LOG);
-      if (url === '/stream/error') return handleSSE(req, res, ERROR_LOG);
       if (url === '/' || url === '/index.html') return serveHtml(res);
       res.writeHead(404);
       res.end('Not found');
