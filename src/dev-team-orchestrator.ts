@@ -27,7 +27,7 @@ export interface SprintTask {
 
 export interface SprintState {
   sprint_number: number;
-  state: 'IDLE' | 'PLANNING' | 'DEBATE' | 'TASKING' | 'DEV' | 'REVIEW' | 'MERGE' | 'COMPLETE';
+  state: 'IDLE' | 'PLANNING' | 'DEBATE' | 'TASKING' | 'DEV' | 'REVIEW' | 'AUTHOR_FIXES' | 'MERGE' | 'COMPLETE';
   paused: boolean;
   started_at: string | null;
   planning_issue: number | null;
@@ -38,13 +38,16 @@ export interface SprintState {
   junior_fork: string;
   debate_round: number;
   review_round: number;
+  task_under_review: number | null;
 }
 
 const STATE_FILE = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
 const PROMPTS_DIR = path.join(process.cwd(), 'data', 'dev-team');
 
 function readState(): SprintState {
-  return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
+  const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
+  state.task_under_review = state.task_under_review ?? null;
+  return state;
 }
 
 function writeState(state: SprintState): void {
@@ -110,6 +113,9 @@ export async function runDevTeamOrchestrator(
       return await checkDevProgress(state, group, chatJid, onProcess);
     case 'REVIEW':
       return await processReview(state, group, chatJid, onProcess);
+    case 'AUTHOR_FIXES':
+      await authorFixTask(state, group, chatJid, onProcess);
+      return 'Author is addressing review feedback.';
     case 'MERGE':
       return await processMerge(state, group, chatJid, onProcess);
     case 'COMPLETE':
@@ -535,8 +541,8 @@ Write a substantive code review. Comment on:
 - Performance considerations
 
 ${shouldApprove
-  ? 'After your review, APPROVE the PR: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --approve --body "..."'
-  : 'After your review, REQUEST CHANGES: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --request-changes --body "..."'
+  ? 'After your review, APPROVE the PR: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --approve --body \"...\"'
+  : 'After your review, REQUEST CHANGES: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --request-changes --body \"...\"'
 }
 
 Also leave 1-3 inline comments on specific lines using:
@@ -548,11 +554,17 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
   needsReview.status = shouldApprove ? 'approved' : 'changes_requested';
 
   if (!shouldApprove) {
-    // Author needs to address changes
+    // Route to AUTHOR_FIXES so the author can address the review feedback
+    state.state = 'AUTHOR_FIXES';
+    state.task_under_review = needsReview.issue;
     state.next_action_at = randomDelay(5, 15);
-  } else {
-    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return `Review round ${state.review_round} for PR #${needsReview.pr}: changes_requested. Routing to author for fixes.`;
   }
+
+  // Reviewer approved — clear the under-review tracking
+  state.task_under_review = null;
+  state.next_action_at = randomDelay(3, 5);
 
   // Check if all tasks are approved
   const allApproved = state.tasks.every(t => t.status === 'approved' || t.status === 'merged');
@@ -562,6 +574,53 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
 
   writeState(state);
   return `Review round ${state.review_round} for PR #${needsReview.pr}: ${needsReview.status}`;
+}
+
+async function authorFixTask(
+  state: SprintState,
+  group: RegisteredGroup,
+  chatJid: string,
+  onProcess: (proc: ChildProcess, containerName: string) => void,
+): Promise<void> {
+  // Find the task currently under review
+  const task = state.tasks.find(t => t.issue === state.task_under_review);
+
+  if (!task || !task.pr) {
+    // Nothing to fix — fall back to REVIEW
+    state.state = 'REVIEW';
+    state.task_under_review = null;
+    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return;
+  }
+
+  // The PR author is the task's assignee
+  const author = task.assignee;
+  const config = agentConfig(author);
+
+  await runAgent(author, `
+You are the author of PR #${task.pr} for Issue #${task.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
+
+A reviewer has requested changes on your PR. Your job is to read their feedback and push fixes.
+
+Steps:
+1. Read the review comments: gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+2. Read the inline review comments: gh api repos/${DEVTEAM_UPSTREAM_REPO}/pulls/${task.pr}/comments
+3. Read the current diff to understand your code: gh pr diff ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO}
+4. Sync your fork and check out your branch:
+   gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
+5. Address ALL the review feedback by pushing additional commits to the same branch.
+6. After pushing your fixes, add a comment on the PR summarising what you changed:
+   gh pr comment ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
+
+Output: FIXES_PUSHED=true
+`, group, chatJid, onProcess);
+
+  // Transition back to REVIEW so the reviewer can re-evaluate
+  state.state = 'REVIEW';
+  state.task_under_review = null;
+  state.next_action_at = randomDelay(5, 15);
+  writeState(state);
 }
 
 async function processMerge(
