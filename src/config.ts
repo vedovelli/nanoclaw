@@ -20,6 +20,10 @@ const envConfig = readEnvFile([
   'DEVTEAM_JUNIOR_GITHUB_TOKEN',
   'DEVTEAM_JUNIOR_GITHUB_USER',
   /* ved custom end */
+  /* ved custom */
+  'LOG_VIEWER_ENABLED',
+  'LOG_VIEWER_PORT',
+  /* ved custom end */
 ]);
 
 export const ASSISTANT_NAME =
@@ -109,4 +113,14 @@ export const DEVTEAM_JUNIOR_GITHUB_USER =
 /* ved custom */
 /** Number of recent user+bot exchange pairs to inject into each agent prompt. */
 export const RECENT_CONTEXT_PAIRS = 3;
+/* ved custom end */
+
+/* ved custom */
+export const LOG_VIEWER_ENABLED =
+  (process.env.LOG_VIEWER_ENABLED || envConfig.LOG_VIEWER_ENABLED) === 'true';
+export const LOG_VIEWER_PORT =
+  parseInt(
+    process.env.LOG_VIEWER_PORT || envConfig.LOG_VIEWER_PORT || '4242',
+    10,
+  ) || 4242;
 /* ved custom end */
