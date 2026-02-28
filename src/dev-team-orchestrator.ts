@@ -664,7 +664,7 @@ async function authorFixTask(
 
   if (!task || !task.pr) {
     // Nothing to fix — fall back to REVIEW
-    console.warn('[authorFixTask] No task or PR found for task_under_review=%s; falling back to REVIEW', state.task_under_review);
+    logger.warn({ task_under_review: state.task_under_review }, 'DevTeam: authorFixTask — no task/PR found; falling back to REVIEW');
     state.state = 'REVIEW';
     state.task_under_review = null;
     state.next_action_at = randomDelay(3, 5);
@@ -676,8 +676,9 @@ async function authorFixTask(
   const author = task.assignee;
   const config = agentConfig(author);
 
+  let fixResult: string;
   try {
-    await runAgent(author, `
+    fixResult = await runAgent(author, `
 You are the author of PR #${task.pr} for Issue #${task.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
 
 A reviewer has requested changes on your PR. Your job is to read their feedback and push fixes.
@@ -692,20 +693,27 @@ Steps:
 6. After pushing your fixes, add a comment on the PR summarising what you changed:
    gh pr comment ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
 
-Output: FIXES_PUSHED=true
+End your response with exactly: FIXES_PUSHED=true
 `, group, chatJid, onProcess);
   } catch (err) {
-    console.error('[authorFixTask] runAgent failed for PR #%s: %s', task.pr, err);
+    logger.error({ pr: task.pr, err }, 'DevTeam: authorFixTask — runAgent failed; will retry');
     // Retry after a short delay rather than leaving state stuck in AUTHOR_FIXES
     state.next_action_at = randomDelay(5, 15);
     writeState(state);
     return `Author fix agent failed for PR #${task.pr}; will retry.`;
   }
 
-  // Reset review_round so the next review cycle starts fresh (not biased by previous task's rounds)
-  state.review_round = 0;
+  // Verify the agent actually pushed fixes before advancing state
+  if (!fixResult.includes('FIXES_PUSHED=true')) {
+    logger.warn({ pr: task.pr }, 'DevTeam: authorFixTask — FIXES_PUSHED not confirmed; will retry');
+    state.next_action_at = randomDelay(5, 15);
+    writeState(state);
+    return `Author fix output did not confirm FIXES_PUSHED for PR #${task.pr}; will retry.`;
+  }
 
   // Transition back to REVIEW so the reviewer can re-evaluate
+  // Note: review_round is NOT reset here — it must keep escalating so the
+  // approval probability increases with each review cycle (prevents infinite loops)
   state.state = 'REVIEW';
   state.task_under_review = null;
   state.next_action_at = randomDelay(5, 15);
@@ -768,7 +776,7 @@ async function finishSprint(state: SprintState): Promise<string> {
     try {
       const prState = execSync(
         `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json state --jq '.state'`,
-        { encoding: 'utf8', timeout: 15000 },
+        { encoding: 'utf8', timeout: 15000, env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
       ).trim();
 
       if (prState !== 'MERGED') {
