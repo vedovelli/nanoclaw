@@ -420,8 +420,8 @@ async function continueDebate(
   // Even rounds → junior (Ana), odd rounds → senior (Carlos).
   const agent: 'senior' | 'junior' = state.debate_round % 2 === 0 ? 'junior' : 'senior';
 
-  // Read the issue comments to understand context
-  await runAgent(agent, `
+  // Junior can engage but CANNOT declare consensus — only PM or senior can close the debate
+  const seniorPrompt = `
 You're participating in Sprint #${state.sprint_number} planning.
 First read the existing comments on Issue #${state.planning_issue}:
   gh issue view ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
@@ -434,7 +434,26 @@ Then add your response as a comment. You can:
 If you feel there's enough agreement on 2-4 tasks, end your comment with: CONSENSUS_REACHED
 
 Use: gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
-`, group, chatJid, onProcess);
+`;
+
+  const juniorPrompt = `
+You're participating in Sprint #${state.sprint_number} planning.
+First read the existing comments on Issue #${state.planning_issue}:
+  gh issue view ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+
+Then add your response as a comment. You can:
+- Agree with proposals and add detail
+- Counter-propose simpler/different approaches
+- Raise concerns or ask questions
+- Suggest modifications
+
+Note: the final call on when the team has reached consensus belongs to the senior dev or PM — not to you.
+Do NOT end your comment with CONSENSUS_REACHED.
+
+Use: gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
+`;
+
+  await runAgent(agent, agent === 'senior' ? seniorPrompt : juniorPrompt, group, chatJid, onProcess);
 
   // Check if orchestrator detects consensus
   const orchestratorResult = await runAgent('orchestrator', `
