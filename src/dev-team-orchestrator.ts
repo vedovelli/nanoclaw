@@ -185,6 +185,97 @@ async function runAgent(
   return capturedResult ?? output.result ?? output.error ?? 'No output';
 }
 
+
+function provisionRepoFiles(): void {
+  const prTemplate = `## Summary
+
+<!-- One or two sentences describing what this PR does -->
+
+## Changes
+
+<!-- List the main changes made -->
+
+## Testing
+
+<!-- Describe how this was tested or verified -->
+
+## Review notes
+
+<!-- Anything the reviewer should pay attention to -->
+`;
+
+  const ciWorkflow = `name: CI
+
+on:
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
+        continue-on-error: true
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+        continue-on-error: true
+`;
+
+  const filesToProvision: Array<{ path: string; content: string; message: string }> = [
+    {
+      path: '.github/pull_request_template.md',
+      content: prTemplate,
+      message: 'chore: add PR template',
+    },
+    {
+      path: '.github/workflows/ci.yml',
+      content: ciWorkflow,
+      message: 'chore: add CI workflow',
+    },
+  ];
+
+  for (const file of filesToProvision) {
+    try {
+      const encoded = Buffer.from(file.content).toString('base64');
+      execSync(
+        `gh api repos/${DEVTEAM_UPSTREAM_REPO}/contents/${file.path} \
+--method PUT \
+--field message=${JSON.stringify(file.message)} \
+--field content=${JSON.stringify(encoded)}`,
+        {
+          encoding: 'utf8',
+          timeout: 15000,
+          env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN },
+        },
+      );
+      logger.info({ path: file.path }, 'DevTeam: provisioned repo file');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // HTTP 422 = file already exists; skip silently
+      if (msg.includes('422') || msg.includes('sha') || msg.includes('already exists')) {
+        logger.info({ path: file.path }, 'DevTeam: repo file already exists, skipping');
+      } else {
+        logger.warn({ path: file.path, err }, 'DevTeam: failed to provision repo file');
+      }
+    }
+  }
+}
+
 async function setupForks(
   state: SprintState,
   group: RegisteredGroup,
@@ -231,6 +322,8 @@ Output the fork URL as: FORK_URL=<url>
     }
     state.junior_fork = match[1].trim();
   }
+
+  provisionRepoFiles();
 
   state.next_action_at = randomDelay(1, 2);
   writeState(state);
