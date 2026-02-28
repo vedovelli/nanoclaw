@@ -16,6 +16,9 @@ import {
 import { RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
+// launchd restricts PATH to /usr/bin:/bin:/usr/sbin:/sbin — extend it so gh is found
+const EXTENDED_PATH = `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? '/usr/bin:/bin'}`;
+
 export interface SprintTask {
   issue: number | null;
   assignee: 'senior' | 'junior';
@@ -260,7 +263,7 @@ jobs:
         {
           encoding: 'utf8',
           timeout: 15000,
-          env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN },
+          env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN },
         },
       );
       logger.info({ path: file.path }, 'DevTeam: provisioned repo file');
@@ -763,7 +766,7 @@ async function processMerge(
   try {
     const prInfo = execSync(
       `gh pr view ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json reviewDecision,mergeable --jq '"REVIEW="+.reviewDecision+" MERGE="+.mergeable'`,
-      { encoding: 'utf8', timeout: 15000, env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+      { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
     ).trim();
     const reviewMatch = prInfo.match(/REVIEW=(\w+)/);
     const mergeMatch = prInfo.match(/MERGE=(\w+)/);
@@ -847,7 +850,7 @@ async function finishSprint(state: SprintState): Promise<string> {
     try {
       const prState = execSync(
         `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json state --jq '.state'`,
-        { encoding: 'utf8', timeout: 15000, env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+        { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
       ).trim();
 
       if (prState !== 'MERGED') {
