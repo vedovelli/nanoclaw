@@ -79,13 +79,17 @@ function agentConfig(agent: 'senior' | 'junior') {
  */
 function postPlanningProgress(state: SprintState, body: string): void {
   if (!state.planning_issue) return;
+  const tmpFile = path.join(process.cwd(), 'data', 'dev-team', `.comment-${Date.now()}.md`);
   try {
+    fs.writeFileSync(tmpFile, body, 'utf-8');
     execSync(
-      `gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body ${JSON.stringify(body)}`,
+      `gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body-file ${JSON.stringify(tmpFile)}`,
       { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
     );
   } catch (err) {
     logger.warn({ issue: state.planning_issue, err }, 'DevTeam: could not post progress comment on planning issue');
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
   }
 }
 
