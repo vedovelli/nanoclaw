@@ -153,3 +153,38 @@ Read Step 12 of `.claude/skills/ved-sync-upstream/SKILL.md` and check whether th
 - **New file that must always exist** — add an existence check
 
 If the regression check already covers the new customization via the `grep -rn "ved custom"` marker count, no update is needed. Only update when the new customization can't be caught by marker presence alone.
+
+## Step 9: Push and create Pull Request
+
+After all steps above are complete, push the feature branch and open a PR automatically:
+
+```bash
+git push -u origin <branch-name>
+```
+
+Then create the PR with `gh pr create`:
+
+```bash
+gh pr create \
+  --title "<type>: <short description of the customization>" \
+  --body "$(cat <<'EOF'
+## Summary
+
+- <bullet per logical change made>
+
+## Test Plan
+
+- [x] `npm run build` passes
+- [x] `npm run test` — N/N tests passing
+- [ ] <manual verification step if applicable>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+Rules:
+- Title format: `feat:`, `fix:`, or `chore:` prefix + concise description
+- Summary bullets: one per logical change (not per file)
+- Test plan: check off what was verified automatically; leave manual steps unchecked for the reviewer
+- Do not merge — leave the PR open for human review
