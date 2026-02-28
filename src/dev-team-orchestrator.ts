@@ -74,6 +74,22 @@ function agentConfig(agent: 'senior' | 'junior') {
 }
 
 /**
+ * Post a structured progress comment on the planning issue using gh CLI directly.
+ * Used to build a timeline log of sprint activity on the planning issue.
+ */
+function postPlanningProgress(state: SprintState, body: string): void {
+  if (!state.planning_issue) return;
+  try {
+    execSync(
+      `gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body ${JSON.stringify(body)}`,
+      { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+    );
+  } catch (err) {
+    logger.warn({ issue: state.planning_issue, err }, 'DevTeam: could not post progress comment on planning issue');
+  }
+}
+
+/**
  * Main orchestrator entry point. Called by the scheduler every 5 minutes.
  * Reads state, checks if next_action_at has passed, executes the next action.
  */
@@ -526,6 +542,26 @@ TASK|<issue_number>|<senior|junior>|<branch_name>
   state.next_action_at = randomDelay(2, 5);
   writeState(state);
 
+  // Post sprint task list to planning issue as the first progress update
+  const taskRows = state.tasks
+    .filter(t => t.issue !== null)
+    .map(t => {
+      const user = agentConfig(t.assignee).user;
+      return `| #${t.issue} | @${user} (${t.assignee}) | 🔄 In progress |`;
+    })
+    .join('\n');
+  postPlanningProgress(state, [
+    `## 📋 Sprint #${state.sprint_number} — Tasks Created`,
+    '',
+    'Planning consensus reached. The following task issues were created:',
+    '',
+    '| Issue | Assignee | Status |',
+    '|-------|----------|--------|',
+    taskRows || '| _(none parsed)_ | — | — |',
+    '',
+    'Development phase has begun.',
+  ].join('\n'));
+
   return `Tasking complete. ${state.tasks.length} tasks created.`;
 }
 
@@ -572,6 +608,20 @@ When done, output: PR_CREATED=<number>
     pendingTask.status = 'pr_created';
     state.next_action_at = randomDelay(10, 30);
     writeState(state);
+
+    // Log PR creation on the planning issue
+    const authorUser = agentConfig(agent).user;
+    const reviewerUser2 = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
+    const branchName = pendingTask.branch || `feature/issue-${pendingTask.issue}`;
+    postPlanningProgress(state, [
+      `## 🚀 PR Opened — Issue #${pendingTask.issue}`,
+      '',
+      `- **PR:** ${pendingTask.pr ? `#${pendingTask.pr}` : '_(number not captured)_'}`,
+      `- **Author:** @${authorUser} (${agent})`,
+      `- **Branch:** \`${branchName}\``,
+      `- **Review requested from:** @${reviewerUser2}`,
+    ].join('\n'));
+
     return `${agent} started working on Issue #${pendingTask.issue}`;
   }
 
@@ -653,6 +703,7 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
 `, group, chatJid, onProcess);
 
   needsReview.status = shouldApprove ? 'approved' : 'changes_requested';
+  const reviewerUser = agentConfig(reviewer).user;
 
   if (!shouldApprove) {
     // Route to AUTHOR_FIXES so the author can address the review feedback
@@ -660,10 +711,25 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
     state.task_under_review = needsReview.issue;
     state.next_action_at = randomDelay(5, 15);
     writeState(state);
+    // Log review outcome on the planning issue
+    postPlanningProgress(state, [
+      `## 🔄 PR #${needsReview.pr} — Changes Requested`,
+      '',
+      `- **Reviewed by:** @${reviewerUser} (${reviewer})`,
+      `- **Outcome:** Changes requested — author must address feedback`,
+      `- **Review round:** ${state.review_round}`,
+    ].join('\n'));
     return `Review round ${state.review_round} for PR #${needsReview.pr}: changes_requested. Routing to author for fixes.`;
   }
 
-  // Reviewer approved — clear the under-review tracking
+  // Reviewer approved — log and clear the under-review tracking
+  postPlanningProgress(state, [
+    `## ✅ PR #${needsReview.pr} Approved`,
+    '',
+    `- **Reviewed by:** @${reviewerUser} (${reviewer})`,
+    `- **Outcome:** Approved — ready to merge`,
+    `- **Review round:** ${state.review_round}`,
+  ].join('\n'));
   state.task_under_review = null;
   state.next_action_at = randomDelay(3, 5);
 
@@ -742,6 +808,16 @@ End your response with exactly: FIXES_PUSHED=true
   state.task_under_review = null;
   state.next_action_at = randomDelay(5, 15);
   writeState(state);
+
+  // Log fix push on the planning issue
+  const fixAuthorUser = agentConfig(author).user;
+  postPlanningProgress(state, [
+    `## 🔧 Fixes Pushed — PR #${task.pr}`,
+    '',
+    `- **Author:** @${fixAuthorUser} (${author})`,
+    `- **Status:** Fixes pushed — awaiting re-review`,
+  ].join('\n'));
+
   return `Author pushed fixes for PR #${task.pr}; returning to REVIEW.`;
 }
 
@@ -829,6 +905,14 @@ Include the error message on the next line.
 
   toMerge.status = 'merged';
 
+  // Log the merge on the planning issue
+  postPlanningProgress(state, [
+    `## ✅ PR #${toMerge.pr} Merged — Issue #${toMerge.issue} Done`,
+    '',
+    `- **Merged by:** PM (automated)`,
+    `- **Closes:** Issue #${toMerge.issue}`,
+  ].join('\n'));
+
   const remaining = state.tasks.filter(t => t.status !== 'merged');
   if (remaining.length === 0) {
     state.state = 'COMPLETE';
@@ -868,6 +952,44 @@ async function finishSprint(state: SprintState): Promise<string> {
     state.next_action_at = randomDelay(3, 5);
     writeState(state);
     return `Sprint not complete — ${unmergedPRs.length} PR(s) still unmerged: #${unmergedPRs.join(', #')}. Returning to MERGE.`;
+  }
+
+  // Post sprint summary and close the planning issue
+  const durationMs = state.started_at ? Date.now() - new Date(state.started_at).getTime() : 0;
+  const durationMin = Math.round(durationMs / 60000);
+  const durationStr = durationMin >= 60
+    ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
+    : `${durationMin}m`;
+  const summaryRows = state.tasks
+    .filter(t => t.issue !== null)
+    .map(t => `| #${t.issue} | @${agentConfig(t.assignee).user} | ${t.pr ? `#${t.pr}` : '—'} | ✅ Merged |`)
+    .join('\n');
+  postPlanningProgress(state, [
+    `## 🏁 Sprint #${state.sprint_number} Complete`,
+    '',
+    '### Summary',
+    `- **Duration:** ${durationStr}`,
+    `- **Tasks completed:** ${state.tasks.filter(t => t.status === 'merged').length}/${state.tasks.length}`,
+    `- **PRs merged:** ${state.tasks.filter(t => t.pr !== null).map(t => `#${t.pr}`).join(', ') || '—'}`,
+    '',
+    '### Tasks',
+    '| Issue | Assignee | PR | Status |',
+    '|-------|----------|----|--------|',
+    summaryRows || '| — | — | — | — |',
+    '',
+    'Sprint complete. The team will begin the next sprint shortly.',
+  ].join('\n'));
+
+  // Close the planning issue now that the sprint is done
+  if (state.planning_issue) {
+    try {
+      execSync(
+        `gh issue close ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comment "Sprint #${state.sprint_number} completed. All tasks merged. Closing this planning issue."`,
+        { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+      );
+    } catch (err) {
+      logger.warn({ issue: state.planning_issue, err }, 'finishSprint: could not close planning issue');
+    }
   }
 
   // Archive sprint
