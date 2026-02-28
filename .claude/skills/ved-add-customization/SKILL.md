@@ -156,6 +156,8 @@ If the regression check already covers the new customization via the `grep -rn "
 
 ## Step 9: Push and create Pull Request
 
+> **Conditional:** This step only applies when the work was developed on a feature branch (i.e., the HARD RULE at the top of this skill was followed). If for any reason the change was committed directly to `main` — or if the user explicitly says to skip the PR — stop here.
+
 After all steps above are complete, push the feature branch and open a PR automatically:
 
 ```bash
@@ -204,6 +206,8 @@ gh pr comment "$PR_NUMBER" --body "@claude please review this pull request"
 ```
 
 ## Step 10: Review and fix loop
+
+> **Conditional:** Only execute if Step 9 was executed (a PR was opened).
 
 After triggering the review, monitor the PR for @claude's response and address all feedback until the PR is approved:
 
