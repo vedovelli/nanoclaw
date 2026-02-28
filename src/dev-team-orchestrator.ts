@@ -7,6 +7,8 @@ import { stopContainer } from './container-runtime.js';
 import {
   DEVTEAM_UPSTREAM_REPO,
   DEVTEAM_FAST_MODE,
+  DEVTEAM_PM_GITHUB_TOKEN,
+  DEVTEAM_PM_GITHUB_USER,
   DEVTEAM_SENIOR_GITHUB_TOKEN,
   DEVTEAM_SENIOR_GITHUB_USER,
   DEVTEAM_JUNIOR_GITHUB_TOKEN,
@@ -125,7 +127,7 @@ async function runAgent(
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
   const config = agent === 'orchestrator'
-    ? { token: DEVTEAM_SENIOR_GITHUB_TOKEN, user: DEVTEAM_SENIOR_GITHUB_USER }
+    ? { token: DEVTEAM_PM_GITHUB_TOKEN, user: DEVTEAM_PM_GITHUB_USER }
     : agentConfig(agent);
 
   const systemPrompt = agent === 'orchestrator'
