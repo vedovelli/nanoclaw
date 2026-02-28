@@ -757,7 +757,57 @@ async function processMerge(
     return 'All tasks merged. Sprint complete.';
   }
 
-  // Orchestrator merges the PR
+  // Pre-check: verify PR is approved and has no conflicts before attempting merge
+  let reviewDecision = '';
+  let mergeable = '';
+  try {
+    const prInfo = execSync(
+      `gh pr view ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json reviewDecision,mergeable --jq '"REVIEW="+.reviewDecision+" MERGE="+.mergeable'`,
+      { encoding: 'utf8', timeout: 15000, env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+    ).trim();
+    const reviewMatch = prInfo.match(/REVIEW=(\w+)/);
+    const mergeMatch = prInfo.match(/MERGE=(\w+)/);
+    reviewDecision = reviewMatch?.[1] ?? '';
+    mergeable = mergeMatch?.[1] ?? '';
+  } catch (err) {
+    logger.warn({ pr: toMerge.pr, err }, 'processMerge: could not check PR state — will retry');
+    state.next_action_at = randomDelay(5, 10);
+    writeState(state);
+    return `Could not check PR #${toMerge.pr} state. Will retry.`;
+  }
+
+  // If reviewer requested changes, send author back to fix loop
+  if (reviewDecision === 'CHANGES_REQUESTED') {
+    logger.warn({ pr: toMerge.pr }, 'processMerge: PR has changes requested — routing to AUTHOR_FIXES');
+    toMerge.status = 'changes_requested';
+    state.state = 'AUTHOR_FIXES';
+    state.task_under_review = toMerge.issue;
+    state.next_action_at = randomDelay(2, 5);
+    writeState(state);
+    return `PR #${toMerge.pr} has changes requested. Routing author to fix loop.`;
+  }
+
+  // If merge conflicts exist, have the author resolve them
+  if (mergeable === 'CONFLICTING') {
+    logger.warn({ pr: toMerge.pr }, 'processMerge: PR has merge conflicts — author must rebase');
+    const author = toMerge.assignee;
+    const config = agentConfig(author);
+    await runAgent(author, `
+PR #${toMerge.pr} on repo ${DEVTEAM_UPSTREAM_REPO} has merge conflicts and cannot be merged.
+
+You must resolve the conflicts:
+1. Sync your fork with upstream: gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
+2. Check out your branch locally
+3. Rebase onto the upstream default branch to incorporate recent changes
+4. Resolve any conflicts, commit, and force-push to your fork
+5. Verify the PR is now conflict-free: gh pr view ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json mergeable
+`, group, chatJid, onProcess);
+    state.next_action_at = randomDelay(5, 10);
+    writeState(state);
+    return `PR #${toMerge.pr} had conflicts. Author is rebasing — will retry merge.`;
+  }
+
+  // PR is approved and mergeable — proceed
   const mergeResult = await runAgent('orchestrator', `
 Merge PR #${toMerge.pr} on repo ${DEVTEAM_UPSTREAM_REPO}:
   gh pr merge ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --squash --delete-branch
