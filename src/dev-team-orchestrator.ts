@@ -1,4 +1,3 @@
-/* ved custom */
 import fs from 'fs';
 import path from 'path';
 import { ChildProcess, exec, execSync } from 'child_process';
@@ -55,10 +54,8 @@ function writeState(state: SprintState): void {
 }
 
 function randomDelay(minMinutes: number, maxMinutes: number): string {
-  /* ved custom */
   // DEVTEAM_FAST_MODE=true: treat "minutes" as seconds for rapid debugging
   const multiplier = DEVTEAM_FAST_MODE ? 1000 : 60 * 1000;
-  /* ved custom end */
   const delayMs = (minMinutes + Math.random() * (maxMinutes - minMinutes)) * multiplier;
   return new Date(Date.now() + delayMs).toISOString();
 }
@@ -143,7 +140,6 @@ async function runAgent(
 
   const model = agent === 'orchestrator' ? 'sonnet' : 'haiku';
 
-  /* ved custom */
   // Capture result early via streaming output callback, then kill the container.
   // Agents keep their process alive after printing results (MCP connections etc),
   // which would block the orchestrator indefinitely waiting for container.on('close').
@@ -185,7 +181,6 @@ async function runAgent(
       }
     },
   );
-  /* ved custom end */
 
   return capturedResult ?? output.result ?? output.error ?? 'No output';
 }
@@ -211,13 +206,11 @@ Output the fork URL as: FORK_URL=<url>
 `, group, chatJid, onProcess);
 
     const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
-    /* ved custom */
     if (!match) {
       logger.error({ result }, 'DevTeam: senior fork setup failed — no FORK_URL in output');
       throw new Error(`Senior fork setup failed. Output: ${result.slice(0, 500)}`);
     }
     state.senior_fork = match[1].trim();
-    /* ved custom end */
   }
 
   if (!state.junior_fork) {
@@ -232,13 +225,11 @@ Output the fork URL as: FORK_URL=<url>
 `, group, chatJid, onProcess);
 
     const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
-    /* ved custom */
     if (!match) {
       logger.error({ result }, 'DevTeam: junior fork setup failed — no FORK_URL in output');
       throw new Error(`Junior fork setup failed. Output: ${result.slice(0, 500)}`);
     }
     state.junior_fork = match[1].trim();
-    /* ved custom end */
   }
 
   state.next_action_at = randomDelay(1, 2);
@@ -334,9 +325,7 @@ async function continueDebate(
   // Alternate between Ana and Carlos
   // Carlos opens debate in round 1 (startDebate). Round 2 = Ana, 3 = Carlos, 4 = Ana.
   // Even rounds → junior (Ana), odd rounds → senior (Carlos).
-  /* ved custom */
   const agent: 'senior' | 'junior' = state.debate_round % 2 === 0 ? 'junior' : 'senior';
-  /* ved custom end */
 
   // Read the issue comments to understand context
   await runAgent(agent, `
@@ -432,19 +421,16 @@ async function checkDevProgress(
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
   // Find a pending task and dispatch the agent
-  /* ved custom */
   // Skip malformed tasks (issue: null or invalid assignee) that may result from
   // the orchestrator agent outputting example/template lines in its TASK| output
   const pendingTask = state.tasks.find(
     t => t.status === 'pending' && t.issue !== null && (t.assignee === 'senior' || t.assignee === 'junior'),
   );
-  /* ved custom end */
 
   if (pendingTask) {
     const agent = pendingTask.assignee;
     const config = agentConfig(agent);
 
-    /* ved custom */
     const devResult = await runAgent(agent, `
 You need to implement ONLY the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
 Do NOT implement any other issues or features beyond what Issue #${pendingTask.issue} describes.
@@ -460,7 +446,6 @@ Steps:
 
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
-    /* ved custom end */
 
     // Parse PR number from agent output so REVIEW and MERGE can reference it
     const prMatch = devResult.match(/PR_CREATED=(\d+)/);
@@ -682,10 +667,9 @@ Include the error message on the next line.
 }
 
 async function finishSprint(state: SprintState): Promise<string> {
-  /* ved custom */
   // Merge gate: verify all PRs are actually merged on GitHub before archiving
   const tasksWithPR = state.tasks.filter(t => t.pr !== null && t.pr !== undefined);
-  const unmergeddPRs: number[] = [];
+  const unmergedPRs: number[] = [];
 
   for (const task of tasksWithPR) {
     try {
@@ -695,22 +679,21 @@ async function finishSprint(state: SprintState): Promise<string> {
       ).trim();
 
       if (prState !== 'MERGED') {
-        unmergeddPRs.push(task.pr!);
+        unmergedPRs.push(task.pr!);
       }
     } catch (err) {
       logger.warn({ pr: task.pr, err }, 'finishSprint: could not check PR state — treating as unmerged');
-      unmergeddPRs.push(task.pr!);
+      unmergedPRs.push(task.pr!);
     }
   }
 
-  if (unmergeddPRs.length > 0) {
-    logger.warn({ unmergeddPRs }, 'finishSprint: unmerged PRs found — returning to MERGE state');
+  if (unmergedPRs.length > 0) {
+    logger.warn({ unmergedPRs }, 'finishSprint: unmerged PRs found — returning to MERGE state');
     state.state = 'MERGE';
     state.next_action_at = randomDelay(3, 5);
     writeState(state);
-    return `Sprint not complete — ${unmergeddPRs.length} PR(s) still unmerged: #${unmergeddPRs.join(', #')}. Returning to MERGE.`;
+    return `Sprint not complete — ${unmergedPRs.length} PR(s) still unmerged: #${unmergedPRs.join(', #')}. Returning to MERGE.`;
   }
-  /* ved custom end */
 
   // Archive sprint
   const historyFile = path.join(
@@ -731,4 +714,3 @@ async function finishSprint(state: SprintState): Promise<string> {
 
   return `Sprint #${state.sprint_number} complete. Next sprint in ~30 minutes.`;
 }
-/* ved custom end */
