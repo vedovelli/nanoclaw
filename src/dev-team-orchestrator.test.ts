@@ -30,6 +30,7 @@ const BASE_STATE = {
   junior_fork: '',
   debate_round: 0,
   review_round: 0,
+  task_under_review: null,
 };
 
 describe('DevTeam Orchestrator', () => {

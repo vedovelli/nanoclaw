@@ -1,12 +1,13 @@
-/* ved custom */
 import fs from 'fs';
 import path from 'path';
-import { ChildProcess, exec } from 'child_process';
+import { ChildProcess, exec, execSync } from 'child_process';
 import { runContainerAgent } from './container-runner.js';
 import { stopContainer } from './container-runtime.js';
 import {
   DEVTEAM_UPSTREAM_REPO,
   DEVTEAM_FAST_MODE,
+  DEVTEAM_PM_GITHUB_TOKEN,
+  DEVTEAM_PM_GITHUB_USER,
   DEVTEAM_SENIOR_GITHUB_TOKEN,
   DEVTEAM_SENIOR_GITHUB_USER,
   DEVTEAM_JUNIOR_GITHUB_TOKEN,
@@ -25,7 +26,7 @@ export interface SprintTask {
 
 export interface SprintState {
   sprint_number: number;
-  state: 'IDLE' | 'PLANNING' | 'DEBATE' | 'TASKING' | 'DEV' | 'REVIEW' | 'MERGE' | 'COMPLETE';
+  state: 'IDLE' | 'PLANNING' | 'DEBATE' | 'TASKING' | 'DEV' | 'REVIEW' | 'AUTHOR_FIXES' | 'MERGE' | 'COMPLETE';
   paused: boolean;
   started_at: string | null;
   planning_issue: number | null;
@@ -36,13 +37,16 @@ export interface SprintState {
   junior_fork: string;
   debate_round: number;
   review_round: number;
+  task_under_review: number | null;
 }
 
 const STATE_FILE = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
 const PROMPTS_DIR = path.join(process.cwd(), 'data', 'dev-team');
 
 function readState(): SprintState {
-  return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
+  const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
+  state.task_under_review = state.task_under_review ?? null;
+  return state;
 }
 
 function writeState(state: SprintState): void {
@@ -50,10 +54,8 @@ function writeState(state: SprintState): void {
 }
 
 function randomDelay(minMinutes: number, maxMinutes: number): string {
-  /* ved custom */
   // DEVTEAM_FAST_MODE=true: treat "minutes" as seconds for rapid debugging
   const multiplier = DEVTEAM_FAST_MODE ? 1000 : 60 * 1000;
-  /* ved custom end */
   const delayMs = (minMinutes + Math.random() * (maxMinutes - minMinutes)) * multiplier;
   return new Date(Date.now() + delayMs).toISOString();
 }
@@ -108,6 +110,8 @@ export async function runDevTeamOrchestrator(
       return await checkDevProgress(state, group, chatJid, onProcess);
     case 'REVIEW':
       return await processReview(state, group, chatJid, onProcess);
+    case 'AUTHOR_FIXES':
+      return await authorFixTask(state, group, chatJid, onProcess);
     case 'MERGE':
       return await processMerge(state, group, chatJid, onProcess);
     case 'COMPLETE':
@@ -125,7 +129,7 @@ async function runAgent(
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
   const config = agent === 'orchestrator'
-    ? { token: DEVTEAM_SENIOR_GITHUB_TOKEN, user: DEVTEAM_SENIOR_GITHUB_USER }
+    ? { token: DEVTEAM_PM_GITHUB_TOKEN, user: DEVTEAM_PM_GITHUB_USER }
     : agentConfig(agent);
 
   const systemPrompt = agent === 'orchestrator'
@@ -136,7 +140,6 @@ async function runAgent(
 
   const model = agent === 'orchestrator' ? 'sonnet' : 'haiku';
 
-  /* ved custom */
   // Capture result early via streaming output callback, then kill the container.
   // Agents keep their process alive after printing results (MCP connections etc),
   // which would block the orchestrator indefinitely waiting for container.on('close').
@@ -178,9 +181,99 @@ async function runAgent(
       }
     },
   );
-  /* ved custom end */
 
   return capturedResult ?? output.result ?? output.error ?? 'No output';
+}
+
+
+function provisionRepoFiles(): void {
+  const prTemplate = `## Summary
+
+<!-- One or two sentences describing what this PR does -->
+
+## Changes
+
+<!-- List the main changes made -->
+
+## Testing
+
+<!-- Describe how this was tested or verified -->
+
+## Review notes
+
+<!-- Anything the reviewer should pay attention to -->
+`;
+
+  const ciWorkflow = `name: CI
+
+on:
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
+        continue-on-error: true
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+        continue-on-error: true
+`;
+
+  const filesToProvision: Array<{ path: string; content: string; message: string }> = [
+    {
+      path: '.github/pull_request_template.md',
+      content: prTemplate,
+      message: 'chore: add PR template',
+    },
+    {
+      path: '.github/workflows/ci.yml',
+      content: ciWorkflow,
+      message: 'chore: add CI workflow',
+    },
+  ];
+
+  for (const file of filesToProvision) {
+    try {
+      const encoded = Buffer.from(file.content).toString('base64');
+      execSync(
+        `gh api repos/${DEVTEAM_UPSTREAM_REPO}/contents/${file.path} \
+--method PUT \
+--field message=${JSON.stringify(file.message)} \
+--field content=${JSON.stringify(encoded)}`,
+        {
+          encoding: 'utf8',
+          timeout: 15000,
+          env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN },
+        },
+      );
+      logger.info({ path: file.path }, 'DevTeam: provisioned repo file');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // HTTP 422 = file already exists; skip silently
+      if (msg.includes('422') || msg.includes('sha') || msg.includes('already exists')) {
+        logger.info({ path: file.path }, 'DevTeam: repo file already exists, skipping');
+      } else {
+        logger.warn({ path: file.path, err }, 'DevTeam: failed to provision repo file');
+      }
+    }
+  }
 }
 
 async function setupForks(
@@ -204,13 +297,11 @@ Output the fork URL as: FORK_URL=<url>
 `, group, chatJid, onProcess);
 
     const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
-    /* ved custom */
     if (!match) {
       logger.error({ result }, 'DevTeam: senior fork setup failed — no FORK_URL in output');
       throw new Error(`Senior fork setup failed. Output: ${result.slice(0, 500)}`);
     }
     state.senior_fork = match[1].trim();
-    /* ved custom end */
   }
 
   if (!state.junior_fork) {
@@ -225,14 +316,14 @@ Output the fork URL as: FORK_URL=<url>
 `, group, chatJid, onProcess);
 
     const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
-    /* ved custom */
     if (!match) {
       logger.error({ result }, 'DevTeam: junior fork setup failed — no FORK_URL in output');
       throw new Error(`Junior fork setup failed. Output: ${result.slice(0, 500)}`);
     }
     state.junior_fork = match[1].trim();
-    /* ved custom end */
   }
+
+  provisionRepoFiles();
 
   state.next_action_at = randomDelay(1, 2);
   writeState(state);
@@ -327,9 +418,7 @@ async function continueDebate(
   // Alternate between Ana and Carlos
   // Carlos opens debate in round 1 (startDebate). Round 2 = Ana, 3 = Carlos, 4 = Ana.
   // Even rounds → junior (Ana), odd rounds → senior (Carlos).
-  /* ved custom */
   const agent: 'senior' | 'junior' = state.debate_round % 2 === 0 ? 'junior' : 'senior';
-  /* ved custom end */
 
   // Read the issue comments to understand context
   await runAgent(agent, `
@@ -425,19 +514,16 @@ async function checkDevProgress(
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
   // Find a pending task and dispatch the agent
-  /* ved custom */
   // Skip malformed tasks (issue: null or invalid assignee) that may result from
   // the orchestrator agent outputting example/template lines in its TASK| output
   const pendingTask = state.tasks.find(
     t => t.status === 'pending' && t.issue !== null && (t.assignee === 'senior' || t.assignee === 'junior'),
   );
-  /* ved custom end */
 
   if (pendingTask) {
     const agent = pendingTask.assignee;
     const config = agentConfig(agent);
 
-    /* ved custom */
     const devResult = await runAgent(agent, `
 You need to implement ONLY the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
 Do NOT implement any other issues or features beyond what Issue #${pendingTask.issue} describes.
@@ -453,7 +539,6 @@ Steps:
 
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
-    /* ved custom end */
 
     // Parse PR number from agent output so REVIEW and MERGE can reference it
     const prMatch = devResult.match(/PR_CREATED=(\d+)/);
@@ -533,8 +618,8 @@ Write a substantive code review. Comment on:
 - Performance considerations
 
 ${shouldApprove
-  ? 'After your review, APPROVE the PR: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --approve --body "..."'
-  : 'After your review, REQUEST CHANGES: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --request-changes --body "..."'
+  ? 'After your review, APPROVE the PR: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --approve --body \"...\"'
+  : 'After your review, REQUEST CHANGES: gh pr review ' + needsReview.pr + ' --repo ' + DEVTEAM_UPSTREAM_REPO + ' --request-changes --body \"...\"'
 }
 
 Also leave 1-3 inline comments on specific lines using:
@@ -546,11 +631,17 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
   needsReview.status = shouldApprove ? 'approved' : 'changes_requested';
 
   if (!shouldApprove) {
-    // Author needs to address changes
+    // Route to AUTHOR_FIXES so the author can address the review feedback
+    state.state = 'AUTHOR_FIXES';
+    state.task_under_review = needsReview.issue;
     state.next_action_at = randomDelay(5, 15);
-  } else {
-    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return `Review round ${state.review_round} for PR #${needsReview.pr}: changes_requested. Routing to author for fixes.`;
   }
+
+  // Reviewer approved — clear the under-review tracking
+  state.task_under_review = null;
+  state.next_action_at = randomDelay(3, 5);
 
   // Check if all tasks are approved
   const allApproved = state.tasks.every(t => t.status === 'approved' || t.status === 'merged');
@@ -560,6 +651,74 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
 
   writeState(state);
   return `Review round ${state.review_round} for PR #${needsReview.pr}: ${needsReview.status}`;
+}
+
+async function authorFixTask(
+  state: SprintState,
+  group: RegisteredGroup,
+  chatJid: string,
+  onProcess: (proc: ChildProcess, containerName: string) => void,
+): Promise<string> {
+  // Find the task currently under review — null guard prevents wrong match when both are null
+  const task = state.tasks.find(t => t.issue !== null && t.issue === state.task_under_review);
+
+  if (!task || !task.pr) {
+    // Nothing to fix — fall back to REVIEW
+    logger.warn({ task_under_review: state.task_under_review }, 'DevTeam: authorFixTask — no task/PR found; falling back to REVIEW');
+    state.state = 'REVIEW';
+    state.task_under_review = null;
+    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return 'No task or PR found to fix; returned to REVIEW.';
+  }
+
+  // The PR author is the task's assignee
+  const author = task.assignee;
+  const config = agentConfig(author);
+
+  let fixResult: string;
+  try {
+    fixResult = await runAgent(author, `
+You are the author of PR #${task.pr} for Issue #${task.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
+
+A reviewer has requested changes on your PR. Your job is to read their feedback and push fixes.
+
+Steps:
+1. Read the review comments: gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+2. Read the inline review comments: gh api repos/${DEVTEAM_UPSTREAM_REPO}/pulls/${task.pr}/comments
+3. Read the current diff to understand your code: gh pr diff ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO}
+4. Sync your fork and check out your branch:
+   gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
+5. Address ALL the review feedback by pushing additional commits to the same branch.
+6. After pushing your fixes, add a comment on the PR summarising what you changed:
+   gh pr comment ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
+
+End your response with exactly: FIXES_PUSHED=true
+`, group, chatJid, onProcess);
+  } catch (err) {
+    logger.error({ pr: task.pr, err }, 'DevTeam: authorFixTask — runAgent failed; will retry');
+    // Retry after a short delay rather than leaving state stuck in AUTHOR_FIXES
+    state.next_action_at = randomDelay(5, 15);
+    writeState(state);
+    return `Author fix agent failed for PR #${task.pr}; will retry.`;
+  }
+
+  // Verify the agent actually pushed fixes before advancing state
+  if (!fixResult.includes('FIXES_PUSHED=true')) {
+    logger.warn({ pr: task.pr }, 'DevTeam: authorFixTask — FIXES_PUSHED not confirmed; will retry');
+    state.next_action_at = randomDelay(5, 15);
+    writeState(state);
+    return `Author fix output did not confirm FIXES_PUSHED for PR #${task.pr}; will retry.`;
+  }
+
+  // Transition back to REVIEW so the reviewer can re-evaluate
+  // Note: review_round is NOT reset here — it must keep escalating so the
+  // approval probability increases with each review cycle (prevents infinite loops)
+  state.state = 'REVIEW';
+  state.task_under_review = null;
+  state.next_action_at = randomDelay(5, 15);
+  writeState(state);
+  return `Author pushed fixes for PR #${task.pr}; returning to REVIEW.`;
 }
 
 async function processMerge(
@@ -578,12 +737,21 @@ async function processMerge(
   }
 
   // Orchestrator merges the PR
-  await runAgent('orchestrator', `
+  const mergeResult = await runAgent('orchestrator', `
 Merge PR #${toMerge.pr} on repo ${DEVTEAM_UPSTREAM_REPO}:
   gh pr merge ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --squash --delete-branch
 
-Output: MERGED=true
+If merge succeeds, output exactly: MERGED=true
+If merge fails for any reason (conflict, permissions, not approved), output: MERGED=false
+Include the error message on the next line.
 `, group, chatJid, onProcess);
+
+  if (!mergeResult.includes('MERGED=true')) {
+    logger.warn({ pr: toMerge.pr, result: mergeResult }, 'Merge failed — will retry next tick');
+    state.next_action_at = randomDelay(5, 10);
+    writeState(state);
+    return `Merge of PR #${toMerge.pr} failed. Will retry.`;
+  }
 
   toMerge.status = 'merged';
 
@@ -600,6 +768,34 @@ Output: MERGED=true
 }
 
 async function finishSprint(state: SprintState): Promise<string> {
+  // Merge gate: verify all PRs are actually merged on GitHub before archiving
+  const tasksWithPR = state.tasks.filter(t => t.pr !== null && t.pr !== undefined);
+  const unmergedPRs: number[] = [];
+
+  for (const task of tasksWithPR) {
+    try {
+      const prState = execSync(
+        `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json state --jq '.state'`,
+        { encoding: 'utf8', timeout: 15000, env: { ...process.env, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+      ).trim();
+
+      if (prState !== 'MERGED') {
+        unmergedPRs.push(task.pr!);
+      }
+    } catch (err) {
+      logger.warn({ pr: task.pr, err }, 'finishSprint: could not check PR state — treating as unmerged');
+      unmergedPRs.push(task.pr!);
+    }
+  }
+
+  if (unmergedPRs.length > 0) {
+    logger.warn({ unmergedPRs }, 'finishSprint: unmerged PRs found — returning to MERGE state');
+    state.state = 'MERGE';
+    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return `Sprint not complete — ${unmergedPRs.length} PR(s) still unmerged: #${unmergedPRs.join(', #')}. Returning to MERGE.`;
+  }
+
   // Archive sprint
   const historyFile = path.join(
     PROMPTS_DIR, 'sprint-history',
@@ -619,4 +815,3 @@ async function finishSprint(state: SprintState): Promise<string> {
 
   return `Sprint #${state.sprint_number} complete. Next sprint in ~30 minutes.`;
 }
-/* ved custom end */

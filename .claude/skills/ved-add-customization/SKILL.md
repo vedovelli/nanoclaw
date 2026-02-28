@@ -81,16 +81,48 @@ The output should show balanced pairs: each opening marker has a corresponding c
 
 ## Step 5: Update the tracker
 
-Add a new entry to the Basic Memory Cloud customizations tracker:
-- Project: `nanoclaw`
-- Permalink: `nanoclaw/nano-claw-custom-modifications-tracker`
-- Tool: `mcp__basic-memory-cloud__edit_note`
+O tracker tem **dois níveis**: a nota principal é uma tabela de alto nível; os detalhes ficam em notas individuais.
 
-Include for each new customization:
-- **File path** — exact path relative to repo root
-- **What** — one sentence describing the change
-- **Why** — why this customization exists (the business reason)
-- **Re-apply difficulty** — easy / medium / hard (how hard to restore after a future merge conflict)
+### 5a — Adicionar linha ao tracker principal
+
+Editar a tabela em `nanoclaw/nano-claw-custom-modifications-tracker` (project: `nanoclaw`) com `mcp__basic-memory-cloud__edit_note` (operation: `find_replace`).
+
+Adicionar uma linha na tabela "Active Customizations" com:
+
+```
+| N | [Nome](nanoclaw/customizations/NN-nome-slug) | PR #X / commit `abc1234` | `arquivo1.ts`, `arquivo2.ts` | Low |
+```
+
+Campos obrigatórios: número sequencial, nome linkado à nota individual, PR ou commit, arquivos upstream modificados (só os modificados — novos arquivos não entram), dificuldade de re-apply (Very Low / Low / Medium / High).
+
+### 5b — Criar nota individual de detalhes
+
+Criar uma nova nota em `nanoclaw/customizations/` com `mcp__basic-memory-cloud__write_note`:
+- **title:** `NN — Nome da Customização`
+- **directory:** `nanoclaw/customizations`
+- **project:** `nanoclaw`
+
+Conteúdo mínimo da nota:
+
+```markdown
+# Nome — Subtítulo
+
+**PR/Branch:** feat/xxx (status)
+**Re-apply difficulty:** Low
+
+## O que faz
+Uma ou duas frases descrevendo o comportamento adicionado ou corrigido.
+
+## Arquivos
+- `src/foo.ts` — **NOVO** ou **MODIFICADO** — descrição da mudança
+- `src/bar.ts` — **MODIFICADO** — descrição da mudança
+
+## Env vars (se houver)
+- `VAR_NAME=valor` — descrição
+
+## Notas de re-apply (se relevante)
+Qualquer detalhe que ajude a restaurar após conflito de merge.
+```
 
 ## Step 6: Build and test check
 
@@ -121,3 +153,52 @@ Read Step 12 of `.claude/skills/ved-sync-upstream/SKILL.md` and check whether th
 - **New file that must always exist** — add an existence check
 
 If the regression check already covers the new customization via the `grep -rn "ved custom"` marker count, no update is needed. Only update when the new customization can't be caught by marker presence alone.
+
+## Step 9: Push and create Pull Request
+
+After all steps above are complete, push the feature branch and open a PR automatically:
+
+```bash
+git push -u origin <branch-name>
+```
+
+Then create the PR with `gh pr create`:
+
+```bash
+gh pr create \
+  --title "<type>: <short description of the customization>" \
+  --body "$(cat <<'EOF'
+## Summary
+
+- <bullet per logical change made>
+
+## Test Plan
+
+- [x] `npm run build` passes
+- [x] `npm run test` — N/N tests passing
+- [ ] <manual verification step if applicable>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+Rules:
+- Title format: `feat:`, `fix:`, or `chore:` prefix + concise description
+- Summary bullets: one per logical change (not per file)
+- Test plan: check off what was verified automatically; leave manual steps unchecked for the reviewer
+- Do not merge — leave the PR open for human review
+
+After the PR is created, post a comment to trigger an automatic code review:
+
+```bash
+gh pr comment <pr-number> --body "@claude please review this pull request"
+```
+
+The PR number is returned by `gh pr create`. Capture it:
+
+```bash
+PR_URL=$(gh pr create --title "..." --body "...")
+PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+gh pr comment "$PR_NUMBER" --body "@claude please review this pull request"
+```
