@@ -1,7 +1,7 @@
 /* ved custom */
 import fs from 'fs';
 import path from 'path';
-import { ChildProcess, exec } from 'child_process';
+import { ChildProcess, exec, execSync } from 'child_process';
 import { runContainerAgent } from './container-runner.js';
 import { stopContainer } from './container-runtime.js';
 import {
@@ -682,6 +682,36 @@ Include the error message on the next line.
 }
 
 async function finishSprint(state: SprintState): Promise<string> {
+  /* ved custom */
+  // Merge gate: verify all PRs are actually merged on GitHub before archiving
+  const tasksWithPR = state.tasks.filter(t => t.pr !== null && t.pr !== undefined);
+  const unmergeddPRs: number[] = [];
+
+  for (const task of tasksWithPR) {
+    try {
+      const prState = execSync(
+        `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json state --jq '.state'`,
+        { encoding: 'utf8', timeout: 15000 },
+      ).trim();
+
+      if (prState !== 'MERGED') {
+        unmergeddPRs.push(task.pr!);
+      }
+    } catch (err) {
+      logger.warn({ pr: task.pr, err }, 'finishSprint: could not check PR state — treating as unmerged');
+      unmergeddPRs.push(task.pr!);
+    }
+  }
+
+  if (unmergeddPRs.length > 0) {
+    logger.warn({ unmergeddPRs }, 'finishSprint: unmerged PRs found — returning to MERGE state');
+    state.state = 'MERGE';
+    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return `Sprint not complete — ${unmergeddPRs.length} PR(s) still unmerged: #${unmergeddPRs.join(', #')}. Returning to MERGE.`;
+  }
+  /* ved custom end */
+
   // Archive sprint
   const historyFile = path.join(
     PROMPTS_DIR, 'sprint-history',
