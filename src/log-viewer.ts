@@ -53,6 +53,7 @@ function tailFile(filePath: string, onLine: (line: string) => void): () => void 
   }
 
   let stopped = false;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   function tryWatch(): void {
     if (stopped) return;   // connection already closed, don't create watcher
@@ -60,13 +61,14 @@ function tailFile(filePath: string, onLine: (line: string) => void): () => void 
       watcher = fs.watch(filePath, read);
     } catch {
       // File doesn't exist yet — retry in 5 seconds
-      setTimeout(tryWatch, 5000);
+      retryTimer = setTimeout(tryWatch, 5000);
     }
   }
   tryWatch();
 
   return () => {
     stopped = true;   // prevent any pending retry from creating a new watcher
+    if (retryTimer) clearTimeout(retryTimer);
     if (watcher) {
       try {
         watcher.close();
@@ -94,7 +96,9 @@ function handleSSE(
     res.write(`data: ${JSON.stringify(line)}\n\n`);
   }
 
-  // Stream new lines as they arrive
+  // Stream new lines as they arrive.
+  // `stop` is declared with let so the callback can reference it before tailFile
+  // returns — safe because fs.watch only fires asynchronously (after this tick).
   let stop: (() => void) | undefined;
   stop = tailFile(logFile, (line) => {
     try {
@@ -173,6 +177,7 @@ const HTML = `<!DOCTYPE html>
       const es = new EventSource(url);
 
       es.onopen = () => {
+        panel.innerHTML = '';   // clear stale lines before backfill arrives
         statusEl.textContent = panelId.replace('panel-', '') + ': live';
         statusEl.className = 'status connected';
       };
