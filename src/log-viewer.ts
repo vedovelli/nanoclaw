@@ -178,6 +178,7 @@ const HTML = `<!DOCTYPE html>
 
       es.onopen = () => {
         panel.innerHTML = '';   // clear stale lines before backfill arrives
+        autoScroll = true;      // reset so backfill auto-scrolls after reconnect
         statusEl.textContent = panelId.replace('panel-', '') + ': live';
         statusEl.className = 'status connected';
       };
