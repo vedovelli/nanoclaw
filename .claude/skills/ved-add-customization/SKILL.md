@@ -202,3 +202,34 @@ PR_URL=$(gh pr create --title "..." --body "...")
 PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
 gh pr comment "$PR_NUMBER" --body "@claude please review this pull request"
 ```
+
+## Step 10: Review and fix loop
+
+After triggering the review, monitor the PR for @claude's response and address all feedback until the PR is approved:
+
+```bash
+# Poll every 60 seconds until new comment appears
+while true; do
+  sleep 60
+  LATEST=$(gh pr view "$PR_NUMBER" --repo <owner>/<repo> --json comments \
+    --jq '[.comments | sort_by(.createdAt) | reverse | .[0] | {author: .author.login, body: .body}]')
+  echo "$LATEST"
+done
+```
+
+Loop protocol:
+1. Wait 60 seconds between each poll — no exponential backoff needed
+2. Read the full review body when @claude responds
+3. Evaluate each item: verify against codebase reality before implementing (see `superpowers:receiving-code-review`)
+4. Implement all valid fixes, run `npm run build && npm run test` to confirm no regressions
+5. Commit with `git add .` and push
+6. Reply on the PR describing each fix and push back on any incorrect suggestions with technical reasoning
+7. End the reply with `@claude please re-review`
+8. Repeat from step 1 until @claude responds with **"LGTM"** or **"ready to merge"**
+
+Once approved, merge with:
+
+```bash
+gh pr merge "$PR_NUMBER" --repo <owner>/<repo> --squash --delete-branch
+git checkout main && git pull
+```
