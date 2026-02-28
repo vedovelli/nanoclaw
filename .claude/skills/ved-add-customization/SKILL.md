@@ -188,3 +188,17 @@ Rules:
 - Summary bullets: one per logical change (not per file)
 - Test plan: check off what was verified automatically; leave manual steps unchecked for the reviewer
 - Do not merge — leave the PR open for human review
+
+After the PR is created, post a comment to trigger an automatic code review:
+
+```bash
+gh pr comment <pr-number> --body "@claude please review this pull request"
+```
+
+The PR number is returned by `gh pr create`. Capture it:
+
+```bash
+PR_URL=$(gh pr create --title "..." --body "...")
+PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+gh pr comment "$PR_NUMBER" --body "@claude please review this pull request"
+```
