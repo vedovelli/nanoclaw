@@ -580,12 +580,21 @@ async function processMerge(
   }
 
   // Orchestrator merges the PR
-  await runAgent('orchestrator', `
+  const mergeResult = await runAgent('orchestrator', `
 Merge PR #${toMerge.pr} on repo ${DEVTEAM_UPSTREAM_REPO}:
   gh pr merge ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --squash --delete-branch
 
-Output: MERGED=true
+If merge succeeds, output exactly: MERGED=true
+If merge fails for any reason (conflict, permissions, not approved), output: MERGED=false
+Include the error message on the next line.
 `, group, chatJid, onProcess);
+
+  if (!mergeResult.includes('MERGED=true')) {
+    logger.warn({ pr: toMerge.pr, result: mergeResult }, 'Merge failed — will retry next tick');
+    state.next_action_at = randomDelay(5, 10);
+    writeState(state);
+    return `Merge of PR #${toMerge.pr} failed. Will retry.`;
+  }
 
   toMerge.status = 'merged';
 
