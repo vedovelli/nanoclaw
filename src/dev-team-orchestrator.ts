@@ -542,6 +542,7 @@ async function checkDevProgress(
   if (pendingTask) {
     const agent = pendingTask.assignee;
     const config = agentConfig(agent);
+    const reviewerUser = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
 
     const devResult = await runAgent(agent, `
 You need to implement ONLY the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
@@ -555,6 +556,7 @@ Steps:
 5. Implement ONLY what Issue #${pendingTask.issue} describes, with multiple atomic commits
 6. Push to your fork
 7. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:your-branch --title "..." --body "Closes #${pendingTask.issue}\n\n..."
+8. Request a review from your teammate: gh pr edit <pr-number> --repo ${DEVTEAM_UPSTREAM_REPO} --add-reviewer ${reviewerUser}
 
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
