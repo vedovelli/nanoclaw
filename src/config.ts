@@ -21,6 +21,10 @@ const envConfig = readEnvFile([
   'DEVTEAM_SENIOR_GITHUB_USER',
   'DEVTEAM_JUNIOR_GITHUB_TOKEN',
   'DEVTEAM_JUNIOR_GITHUB_USER',
+  'DEVTEAM_MID_GITHUB_TOKEN',
+  'DEVTEAM_MID_GITHUB_USER',
+  'DEVTEAM_MID_SKIP_PROBABILITY',
+  'DEVTEAM_MAX_SPRINT_TICKS',
   /* ved custom end */
   /* ved custom */
   'LOG_VIEWER_ENABLED',
@@ -114,6 +118,14 @@ export const DEVTEAM_JUNIOR_GITHUB_TOKEN =
   process.env.DEVTEAM_JUNIOR_GITHUB_TOKEN || envConfig.DEVTEAM_JUNIOR_GITHUB_TOKEN || '';
 export const DEVTEAM_JUNIOR_GITHUB_USER =
   process.env.DEVTEAM_JUNIOR_GITHUB_USER || envConfig.DEVTEAM_JUNIOR_GITHUB_USER || '';
+export const DEVTEAM_MID_GITHUB_TOKEN =
+  process.env.DEVTEAM_MID_GITHUB_TOKEN || envConfig.DEVTEAM_MID_GITHUB_TOKEN || '';
+export const DEVTEAM_MID_GITHUB_USER =
+  process.env.DEVTEAM_MID_GITHUB_USER || envConfig.DEVTEAM_MID_GITHUB_USER || '';
+export const DEVTEAM_MID_SKIP_PROBABILITY =
+  parseFloat(process.env.DEVTEAM_MID_SKIP_PROBABILITY || envConfig.DEVTEAM_MID_SKIP_PROBABILITY || '0.4');
+export const DEVTEAM_MAX_SPRINT_TICKS =
+  parseInt(process.env.DEVTEAM_MAX_SPRINT_TICKS || envConfig.DEVTEAM_MAX_SPRINT_TICKS || '30', 10);
 /* ved custom end */
 
 /* ved custom */

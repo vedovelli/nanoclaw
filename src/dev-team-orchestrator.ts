@@ -12,6 +12,10 @@ import {
   DEVTEAM_SENIOR_GITHUB_USER,
   DEVTEAM_JUNIOR_GITHUB_TOKEN,
   DEVTEAM_JUNIOR_GITHUB_USER,
+  DEVTEAM_MID_GITHUB_TOKEN,
+  DEVTEAM_MID_GITHUB_USER,
+  DEVTEAM_MID_SKIP_PROBABILITY,
+  DEVTEAM_MAX_SPRINT_TICKS,
 } from './config.js';
 import { RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
@@ -71,10 +75,10 @@ function readPrompt(filename: string): string {
   return fs.readFileSync(path.join(PROMPTS_DIR, filename), 'utf-8');
 }
 
-function agentConfig(agent: 'senior' | 'junior') {
-  return agent === 'senior'
-    ? { token: DEVTEAM_SENIOR_GITHUB_TOKEN, user: DEVTEAM_SENIOR_GITHUB_USER }
-    : { token: DEVTEAM_JUNIOR_GITHUB_TOKEN, user: DEVTEAM_JUNIOR_GITHUB_USER };
+function agentConfig(agent: 'senior' | 'junior' | 'mid') {
+  if (agent === 'senior') return { token: DEVTEAM_SENIOR_GITHUB_TOKEN, user: DEVTEAM_SENIOR_GITHUB_USER };
+  if (agent === 'mid') return { token: DEVTEAM_MID_GITHUB_TOKEN, user: DEVTEAM_MID_GITHUB_USER };
+  return { token: DEVTEAM_JUNIOR_GITHUB_TOKEN, user: DEVTEAM_JUNIOR_GITHUB_USER };
 }
 
 /**
@@ -149,7 +153,7 @@ export async function runDevTeamOrchestrator(
 }
 
 async function runAgent(
-  agent: 'senior' | 'junior' | 'orchestrator',
+  agent: 'senior' | 'junior' | 'mid' | 'orchestrator',
   prompt: string,
   group: RegisteredGroup,
   chatJid: string,
@@ -161,7 +165,11 @@ async function runAgent(
 
   const systemPrompt = agent === 'orchestrator'
     ? readPrompt('orchestrator-prompt.md')
-    : readPrompt(agent === 'senior' ? 'carlos-prompt.md' : 'ana-prompt.md');
+    : readPrompt(
+        agent === 'senior' ? 'carlos-prompt.md'
+        : agent === 'mid' ? 'thiago-prompt.md'
+        : 'ana-prompt.md'
+      );
 
   const fullPrompt = `${systemPrompt}\n\n---\n\n## Current Task\n\n${prompt}`;
 
@@ -188,7 +196,10 @@ async function runAgent(
       chatJid,
       isMain: false,
       isScheduledTask: true,
-      assistantName: agent === 'senior' ? 'Carlos' : agent === 'junior' ? 'Ana' : 'Orchestrator',
+      assistantName: agent === 'senior' ? 'Carlos'
+        : agent === 'junior' ? 'Ana'
+        : agent === 'mid' ? 'Thiago'
+        : 'Orchestrator',
       model,
       secrets: {
         GITHUB_TOKEN: config.token,
