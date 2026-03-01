@@ -842,91 +842,111 @@ async function processMerge(
   chatJid: string,
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
-  const toMerge = state.tasks.find(t => t.status === 'approved');
+  const approvedTasks = state.tasks.filter(t => t.status === 'approved' && t.pr !== null);
 
-  if (!toMerge || !toMerge.pr) {
+  if (approvedTasks.length === 0) {
     state.state = 'COMPLETE';
     state.next_action_at = randomDelay(1, 2);
     writeState(state);
     return 'All tasks merged. Sprint complete.';
   }
 
-  // Pre-check: verify PR is approved and has no conflicts before attempting merge
-  let reviewDecision = '';
-  let mergeable = '';
-  try {
-    const prInfo = execSync(
-      `gh pr view ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json reviewDecision,mergeable --jq '"REVIEW="+.reviewDecision+" MERGE="+.mergeable'`,
-      { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
-    ).trim();
-    const reviewMatch = prInfo.match(/REVIEW=(\w+)/);
-    const mergeMatch = prInfo.match(/MERGE=(\w+)/);
-    reviewDecision = reviewMatch?.[1] ?? '';
-    mergeable = mergeMatch?.[1] ?? '';
-  } catch (err) {
-    logger.warn({ pr: toMerge.pr, err }, 'processMerge: could not check PR state — will retry');
-    state.next_action_at = randomDelay(5, 10);
-    writeState(state);
-    return `Could not check PR #${toMerge.pr} state. Will retry.`;
-  }
+  // Pre-check every approved PR before attempting any merge
+  const readyToMerge: SprintTask[] = [];
+  const tickResults: string[] = [];
 
-  // If reviewer requested changes, send author back to fix loop
-  if (reviewDecision === 'CHANGES_REQUESTED') {
-    logger.warn({ pr: toMerge.pr }, 'processMerge: PR has changes requested — routing to AUTHOR_FIXES');
-    toMerge.status = 'changes_requested';
-    state.state = 'AUTHOR_FIXES';
-    state.task_under_review = toMerge.issue;
-    state.next_action_at = randomDelay(2, 5);
-    writeState(state);
-    return `PR #${toMerge.pr} has changes requested. Routing author to fix loop.`;
-  }
+  for (const task of approvedTasks) {
+    let reviewDecision = '';
+    let mergeable = '';
+    try {
+      const prInfo = execSync(
+        `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json reviewDecision,mergeable --jq '"REVIEW="+.reviewDecision+" MERGE="+.mergeable'`,
+        { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+      ).trim();
+      const reviewMatch = prInfo.match(/REVIEW=(\w+)/);
+      const mergeMatch = prInfo.match(/MERGE=(\w+)/);
+      reviewDecision = reviewMatch?.[1] ?? '';
+      mergeable = mergeMatch?.[1] ?? '';
+    } catch (err) {
+      logger.warn({ pr: task.pr, err }, 'processMerge: could not check PR state — skipping this tick');
+      continue;
+    }
 
-  // If merge conflicts exist, have the author resolve them
-  if (mergeable === 'CONFLICTING') {
-    logger.warn({ pr: toMerge.pr }, 'processMerge: PR has merge conflicts — author must rebase');
-    const author = toMerge.assignee;
-    const config = agentConfig(author);
-    await runAgent(author, `
-PR #${toMerge.pr} on repo ${DEVTEAM_UPSTREAM_REPO} has merge conflicts and cannot be merged.
+    if (reviewDecision === 'CHANGES_REQUESTED') {
+      logger.warn({ pr: task.pr }, 'processMerge: PR has changes requested — routing to AUTHOR_FIXES');
+      task.status = 'changes_requested';
+      state.state = 'AUTHOR_FIXES';
+      state.task_under_review = task.issue;
+      state.next_action_at = randomDelay(2, 5);
+      writeState(state);
+      return `PR #${task.pr} has changes requested. Routing author to fix loop.`;
+    }
+
+    if (mergeable === 'CONFLICTING') {
+      logger.warn({ pr: task.pr }, 'processMerge: PR has merge conflicts — author must rebase');
+      const author = task.assignee;
+      const config = agentConfig(author);
+      await runAgent(author, `
+PR #${task.pr} on repo ${DEVTEAM_UPSTREAM_REPO} has merge conflicts and cannot be merged.
 
 You must resolve the conflicts:
 1. Sync your fork with upstream: gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
 2. Check out your branch locally
 3. Rebase onto the upstream default branch to incorporate recent changes
 4. Resolve any conflicts, commit, and force-push to your fork
-5. Verify the PR is now conflict-free: gh pr view ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json mergeable
+5. Verify the PR is now conflict-free: gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json mergeable
 `, group, chatJid, onProcess);
-    state.next_action_at = randomDelay(5, 10);
-    writeState(state);
-    return `PR #${toMerge.pr} had conflicts. Author is rebasing — will retry merge.`;
+      tickResults.push(`PR #${task.pr} had conflicts. Author is rebasing — will retry merge.`);
+      continue;
+    }
+
+    readyToMerge.push(task);
   }
 
-  // PR is approved and mergeable — proceed
-  const mergeResult = await runAgent('orchestrator', `
-Merge PR #${toMerge.pr} on repo ${DEVTEAM_UPSTREAM_REPO}:
-  gh pr merge ${toMerge.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --squash --delete-branch
-
-If merge succeeds, output exactly: MERGED=true
-If merge fails for any reason (conflict, permissions, not approved), output: MERGED=false
-Include the error message on the next line.
-`, group, chatJid, onProcess);
-
-  if (!mergeResult.includes('MERGED=true')) {
-    logger.warn({ pr: toMerge.pr, result: mergeResult }, 'Merge failed — will retry next tick');
+  if (readyToMerge.length === 0) {
+    // All approved PRs had conflicts or check errors; nothing to merge this tick
     state.next_action_at = randomDelay(5, 10);
     writeState(state);
-    return `Merge of PR #${toMerge.pr} failed. Will retry.`;
+    return tickResults.length > 0 ? tickResults.join('\n') : 'No PRs ready to merge this tick. Will retry.';
   }
 
-  toMerge.status = 'merged';
+  // Dispatch a single orchestrator agent to merge ALL ready PRs at once
+  const mergeInstructions = readyToMerge
+    .map(
+      t =>
+        `gh pr merge ${t.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --squash --delete-branch\n` +
+        `Output exactly: MERGED_${t.pr}=true on success, MERGED_${t.pr}=false on failure (include error on next line).`,
+    )
+    .join('\n\n');
 
-  // Log the merge on the planning issue
-  postPlanningProgress(state, [
-    `## ✅ PR #${toMerge.pr} Merged — Issue #${toMerge.issue} Done`,
-    '',
-    `- **Merged by:** PM (automated)`,
-    `- **Closes:** Issue #${toMerge.issue}`,
-  ].join('\n'));
+  const mergeResult = await runAgent(
+    'orchestrator',
+    `
+Merge all of the following approved PRs on repo ${DEVTEAM_UPSTREAM_REPO}.
+Execute each merge command in sequence and output the result line immediately after each attempt:
+
+${mergeInstructions}
+`,
+    group,
+    chatJid,
+    onProcess,
+  );
+
+  for (const task of readyToMerge) {
+    if (mergeResult.includes(`MERGED_${task.pr}=true`)) {
+      task.status = 'merged';
+      postPlanningProgress(state, [
+        `## ✅ PR #${task.pr} Merged — Issue #${task.issue} Done`,
+        '',
+        `- **Merged by:** PM (automated)`,
+        `- **Closes:** Issue #${task.issue}`,
+      ].join('\n'));
+      tickResults.push(`PR #${task.pr} merged.`);
+    } else {
+      logger.warn({ pr: task.pr, result: mergeResult }, 'Merge failed — will retry next tick');
+      tickResults.push(`Merge of PR #${task.pr} failed. Will retry.`);
+    }
+  }
 
   const remaining = state.tasks.filter(t => t.status !== 'merged');
   if (remaining.length === 0) {
@@ -937,7 +957,7 @@ Include the error message on the next line.
   }
 
   writeState(state);
-  return `PR #${toMerge.pr} merged.`;
+  return tickResults.join('\n');
 }
 
 async function finishSprint(state: SprintState): Promise<string> {
