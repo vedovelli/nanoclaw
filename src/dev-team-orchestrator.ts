@@ -650,14 +650,12 @@ async function processReview(
   chatJid: string,
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
-  state.review_round++;
-
-  // Find a task that needs review
+  // Find a task that needs review — must have a real PR number
   const needsReview = state.tasks.find(
-    t => t.status === 'pr_created' || t.status === 'changes_requested'
+    t => (t.status === 'pr_created' || t.status === 'changes_requested') && t.pr !== null
   );
 
-  if (!needsReview || !needsReview.pr) {
+  if (!needsReview) {
     // Check if all approved
     const allApproved = state.tasks.every(t => t.status === 'approved' || t.status === 'merged');
     if (allApproved) {
@@ -666,10 +664,23 @@ async function processReview(
       writeState(state);
       return 'All PRs approved. Moving to merge.';
     }
+    // Check for tasks stuck with pr_created but no PR number — reset to pending
+    const stuck = state.tasks.filter(t => t.status === 'pr_created' && t.pr === null);
+    if (stuck.length > 0) {
+      logger.warn({ stuck: stuck.map(t => t.issue) }, 'processReview: tasks have pr_created status but no PR number — resetting to pending');
+      for (const t of stuck) { t.status = 'pending'; }
+      state.state = 'DEV';
+      state.next_action_at = randomDelay(2, 5);
+      writeState(state);
+      return `Reset ${stuck.length} stuck task(s) to pending. Returning to DEV.`;
+    }
     state.next_action_at = randomDelay(5, 15);
     writeState(state);
     return 'Waiting for PRs to review.';
   }
+
+  // Only increment review_round when an actual review is dispatched
+  state.review_round++;
 
   // Cross-review: the other agent reviews
   const reviewer = needsReview.assignee === 'senior' ? 'junior' : 'senior';
