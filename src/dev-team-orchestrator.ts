@@ -57,6 +57,8 @@ const PROMPTS_DIR = path.join(process.cwd(), 'data', 'dev-team');
 function readState(): SprintState {
   const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
   state.task_under_review = state.task_under_review ?? null;
+  state.ticks_elapsed = state.ticks_elapsed ?? 0;
+  state.max_ticks = state.max_ticks ?? DEVTEAM_MAX_SPRINT_TICKS;
   return state;
 }
 
@@ -443,9 +445,6 @@ Return the issue number in your response as: ISSUE_NUMBER=<number>
     state.planning_issue = parseInt(match[1], 10);
   }
 
-  // Clear carried_over_tasks after injecting into planning
-  state.carried_over_tasks = undefined;
-
   state.next_action_at = randomDelay(3, 8);
   writeState(state);
 
@@ -488,17 +487,9 @@ async function continueDebate(
 ): Promise<string> {
   state.debate_round++;
 
-  if (state.debate_round > 6) {
-    // Force move to tasking after 6 rounds (3-way rotation = 2 full cycles)
-    state.state = 'TASKING';
-    state.next_action_at = randomDelay(2, 5);
-    writeState(state);
-    return 'Debate concluded (max rounds). Moving to tasking.';
-  }
-
-  // 3-way rotation: Carlos opens in round 1 (startDebate), then Ana, Thiago, Carlos, Ana, Thiago...
-  // Round 1 = senior (startDebate), round 2 = junior, round 3 = mid, round 4 = senior, ...
-  const agentByRound: Array<'senior' | 'junior' | 'mid'> = ['junior', 'mid', 'senior', 'junior', 'mid', 'senior'];
+  // 3-way rotation: Carlos opens in round 1 (startDebate), then Ana, Thiago, Carlos...
+  // round 2 → junior (Ana), round 3 → mid (Thiago), round 4 → senior (Carlos), ...
+  const agentByRound: Array<'senior' | 'junior' | 'mid'> = ['senior', 'junior', 'mid'];
   const agent = agentByRound[(state.debate_round - 1) % 3] ?? 'junior';
 
   const seniorPrompt = `
@@ -1164,25 +1155,43 @@ async function closeSprintByTimeout(
   chatJid: string,
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
-  // Identify pending tasks (no PR yet) — these are carried over
+  // Identify unfinished tasks — all non-merged tasks are carried over
   const pendingTasks = state.tasks.filter(t => !t.pr && t.status === 'pending');
   const inProgressTasks = state.tasks.filter(t => !t.pr && t.status !== 'pending');
+  // Tasks with open PRs (in_review, changes_requested, approved) are also unfinished
+  const openPRTasks = state.tasks.filter(t => t.pr && t.status !== 'merged');
 
-  const carriedOver = [...pendingTasks, ...inProgressTasks];
+  const carriedOver = [...pendingTasks, ...inProgressTasks, ...openPRTasks];
 
   // Post carry-over comment on planning issue
-  if (state.planning_issue && carriedOver.length > 0) {
-    const issueList = carriedOver.map(t => `- #${t.issue} (${t.assignee})`).join('\n');
+  if (state.planning_issue) {
+    const noWorkDone = carriedOver.length === 0;
+    const issueList = carriedOver.map(t => {
+      const prNote = t.pr ? ` (PR #${t.pr} aberto)` : '';
+      return `- #${t.issue} (${t.assignee})${prNote}`;
+    }).join('\n');
     postPlanningProgress(state, [
       `## ⏱️ Sprint #${state.sprint_number} Encerrado por Tempo`,
       '',
       `O sprint atingiu o limite de ${state.max_ticks} ticks sem que todas as tarefas fossem concluídas.`,
       '',
-      '### Tarefas não finalizadas (serão carried over):',
-      issueList,
+      noWorkDone
+        ? 'Todas as tarefas foram finalizadas antes do encerramento.'
+        : '### Tarefas não finalizadas (serão carried over):',
+      noWorkDone ? '' : issueList,
       '',
-      'Estas issues serão incluídas automaticamente no planejamento do próximo sprint.',
+      noWorkDone ? '' : 'Estas issues serão incluídas automaticamente no planejamento do próximo sprint.',
     ].join('\n'));
+
+    // Close the planning issue (same as finishSprint)
+    try {
+      execSync(
+        `gh issue close ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comment "Sprint #${state.sprint_number} encerrado por tempo (${state.ticks_elapsed}/${state.max_ticks} ticks). ${carriedOver.length} tarefa(s) em carry-over."`,
+        { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+      );
+    } catch (err) {
+      logger.warn({ issue: state.planning_issue, err }, 'closeSprintByTimeout: could not close planning issue');
+    }
   }
 
   // Archive the sprint with timeout marker
