@@ -12,6 +12,13 @@ vi.mock('./config.js', () => ({
   DEVTEAM_SENIOR_GITHUB_USER: 'carlos-test',
   DEVTEAM_JUNIOR_GITHUB_TOKEN: 'token-jr',
   DEVTEAM_JUNIOR_GITHUB_USER: 'ana-test',
+  DEVTEAM_MID_GITHUB_TOKEN: 'token-mid',
+  DEVTEAM_MID_GITHUB_USER: 'thiago-test',
+  DEVTEAM_MID_SKIP_PROBABILITY: 0.4,
+  DEVTEAM_MAX_SPRINT_TICKS: 30,
+  DEVTEAM_FAST_MODE: false,
+  DEVTEAM_PM_GITHUB_TOKEN: 'token-pm',
+  DEVTEAM_PM_GITHUB_USER: 'pm-test',
 }));
 vi.mock('./logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn() },

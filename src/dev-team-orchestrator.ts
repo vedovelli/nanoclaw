@@ -12,6 +12,10 @@ import {
   DEVTEAM_SENIOR_GITHUB_USER,
   DEVTEAM_JUNIOR_GITHUB_TOKEN,
   DEVTEAM_JUNIOR_GITHUB_USER,
+  DEVTEAM_MID_GITHUB_TOKEN,
+  DEVTEAM_MID_GITHUB_USER,
+  DEVTEAM_MID_SKIP_PROBABILITY,
+  DEVTEAM_MAX_SPRINT_TICKS,
 } from './config.js';
 import { RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
@@ -21,7 +25,7 @@ const EXTENDED_PATH = `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? '/
 
 export interface SprintTask {
   issue: number | null;
-  assignee: 'senior' | 'junior';
+  assignee: 'senior' | 'junior' | 'mid';
   pr: number | null;
   status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged';
   branch: string | null;
@@ -38,9 +42,13 @@ export interface SprintState {
   upstream_repo: string;
   senior_fork: string;
   junior_fork: string;
+  mid_fork: string;
   debate_round: number;
   review_round: number;
   task_under_review: number | null;
+  ticks_elapsed: number;
+  max_ticks: number;
+  carried_over_tasks?: SprintTask[];
 }
 
 const STATE_FILE = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
@@ -49,6 +57,8 @@ const PROMPTS_DIR = path.join(process.cwd(), 'data', 'dev-team');
 function readState(): SprintState {
   const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
   state.task_under_review = state.task_under_review ?? null;
+  state.ticks_elapsed = state.ticks_elapsed ?? 0;
+  state.max_ticks = state.max_ticks ?? DEVTEAM_MAX_SPRINT_TICKS;
   return state;
 }
 
@@ -67,10 +77,10 @@ function readPrompt(filename: string): string {
   return fs.readFileSync(path.join(PROMPTS_DIR, filename), 'utf-8');
 }
 
-function agentConfig(agent: 'senior' | 'junior') {
-  return agent === 'senior'
-    ? { token: DEVTEAM_SENIOR_GITHUB_TOKEN, user: DEVTEAM_SENIOR_GITHUB_USER }
-    : { token: DEVTEAM_JUNIOR_GITHUB_TOKEN, user: DEVTEAM_JUNIOR_GITHUB_USER };
+function agentConfig(agent: 'senior' | 'junior' | 'mid') {
+  if (agent === 'senior') return { token: DEVTEAM_SENIOR_GITHUB_TOKEN, user: DEVTEAM_SENIOR_GITHUB_USER };
+  if (agent === 'mid') return { token: DEVTEAM_MID_GITHUB_TOKEN, user: DEVTEAM_MID_GITHUB_USER };
+  return { token: DEVTEAM_JUNIOR_GITHUB_TOKEN, user: DEVTEAM_JUNIOR_GITHUB_USER };
 }
 
 /**
@@ -114,11 +124,24 @@ export async function runDevTeamOrchestrator(
   }
 
   // One-time setup: fork the upstream repo from each agent account if not done yet
-  if (!state.senior_fork || !state.junior_fork) {
+  if (!state.senior_fork || !state.mid_fork || !state.junior_fork) {
     return await setupForks(state, group, chatJid, onProcess);
   }
 
   logger.info({ state: state.state, sprint: state.sprint_number }, 'DevTeam orchestrator tick');
+
+  // Tick counter: increment on every active (non-IDLE) state tick
+  const activeStates = ['PLANNING', 'DEBATE', 'TASKING', 'DEV', 'REVIEW', 'AUTHOR_FIXES', 'MERGE'];
+  if (activeStates.includes(state.state)) {
+    state.ticks_elapsed = (state.ticks_elapsed ?? 0) + 1;
+    writeState(state);
+
+    // Sprint timeout: close sprint if tick limit reached
+    if (state.ticks_elapsed >= state.max_ticks) {
+      logger.info({ ticks: state.ticks_elapsed, max: state.max_ticks }, 'DevTeam: sprint timeout reached');
+      return await closeSprintByTimeout(state, group, chatJid, onProcess);
+    }
+  }
 
   switch (state.state) {
     case 'IDLE':
@@ -145,7 +168,7 @@ export async function runDevTeamOrchestrator(
 }
 
 async function runAgent(
-  agent: 'senior' | 'junior' | 'orchestrator',
+  agent: 'senior' | 'junior' | 'mid' | 'orchestrator',
   prompt: string,
   group: RegisteredGroup,
   chatJid: string,
@@ -157,7 +180,11 @@ async function runAgent(
 
   const systemPrompt = agent === 'orchestrator'
     ? readPrompt('orchestrator-prompt.md')
-    : readPrompt(agent === 'senior' ? 'carlos-prompt.md' : 'ana-prompt.md');
+    : readPrompt(
+        agent === 'senior' ? 'carlos-prompt.md'
+        : agent === 'mid' ? 'thiago-prompt.md'
+        : 'ana-prompt.md'
+      );
 
   const fullPrompt = `${systemPrompt}\n\n---\n\n## Current Task\n\n${prompt}`;
 
@@ -184,7 +211,10 @@ async function runAgent(
       chatJid,
       isMain: false,
       isScheduledTask: true,
-      assistantName: agent === 'senior' ? 'Carlos' : agent === 'junior' ? 'Ana' : 'Orchestrator',
+      assistantName: agent === 'senior' ? 'Carlos'
+        : agent === 'junior' ? 'Ana'
+        : agent === 'mid' ? 'Thiago'
+        : 'Orchestrator',
       model,
       secrets: {
         GITHUB_TOKEN: config.token,
@@ -306,7 +336,7 @@ async function setupForks(
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
   const repoBaseName = DEVTEAM_UPSTREAM_REPO.split('/')[1];
-  logger.info('DevTeam: setting up forks for senior and junior agents');
+  logger.info('DevTeam: setting up forks for senior, mid, and junior agents');
 
   if (!state.senior_fork) {
     const result = await runAgent('senior', `
@@ -325,6 +355,25 @@ Output the fork URL as: FORK_URL=<url>
       throw new Error(`Senior fork setup failed. Output: ${result.slice(0, 500)}`);
     }
     state.senior_fork = match[1].trim();
+  }
+
+  if (!state.mid_fork) {
+    const result = await runAgent('mid', `
+Fork the upstream repo ${DEVTEAM_UPSTREAM_REPO} into your account if it doesn't exist yet:
+  gh repo fork ${DEVTEAM_UPSTREAM_REPO} --clone=false --remote=false
+
+Then confirm the fork URL by running:
+  gh repo view ${DEVTEAM_MID_GITHUB_USER}/${repoBaseName} --json url -q .url
+
+Output the fork URL as: FORK_URL=<url>
+`, group, chatJid, onProcess);
+
+    const match = result.match(/FORK_URL=(https?:\/\/\S+)/);
+    if (!match) {
+      logger.error({ result }, 'DevTeam: mid fork setup failed — no FORK_URL in output');
+      throw new Error(`Mid fork setup failed. Output: ${result.slice(0, 500)}`);
+    }
+    state.mid_fork = match[1].trim();
   }
 
   if (!state.junior_fork) {
@@ -350,7 +399,7 @@ Output the fork URL as: FORK_URL=<url>
 
   state.next_action_at = randomDelay(1, 2);
   writeState(state);
-  return `Forks ready — senior: ${state.senior_fork} | junior: ${state.junior_fork}`;
+  return `Forks ready — senior: ${state.senior_fork} | mid: ${state.mid_fork} | junior: ${state.junior_fork}`;
 }
 
 async function startNewSprint(
@@ -365,6 +414,14 @@ async function startNewSprint(
   state.tasks = [];
   state.debate_round = 0;
   state.review_round = 0;
+  state.ticks_elapsed = 0;
+  state.max_ticks = DEVTEAM_MAX_SPRINT_TICKS;
+
+  // Build carry-over context for planning issue
+  const carriedOver = state.carried_over_tasks ?? [];
+  const carryOverSection = carriedOver.length > 0
+    ? `\n\n## Tarefas do sprint anterior não finalizadas (carried over)\n\nAs seguintes issues não foram concluídas no sprint anterior e devem ser priorizadas:\n\n${carriedOver.map(t => `- #${t.issue} (assignee: @${agentConfig(t.assignee).user})`).join('\n')}\n`
+    : '';
 
   // Use orchestrator (Sonnet) to create the planning issue
   const result = await runAgent('orchestrator', `
@@ -374,8 +431,8 @@ Title: "Sprint #${state.sprint_number} Planning"
 
 Body should include:
 - A brief summary of what the team should focus on this sprint
-- A call for @${DEVTEAM_SENIOR_GITHUB_USER} and @${DEVTEAM_JUNIOR_GITHUB_USER} to propose features
-- Reference to previous sprints if sprint_number > 1
+- A call for @${DEVTEAM_SENIOR_GITHUB_USER}, @${DEVTEAM_MID_GITHUB_USER} and @${DEVTEAM_JUNIOR_GITHUB_USER} to propose features
+- Reference to previous sprints if sprint_number > 1${carryOverSection}
 
 Use: gh issue create --repo ${DEVTEAM_UPSTREAM_REPO} --title "Sprint #${state.sprint_number} Planning" --body "..."
 
@@ -430,20 +487,11 @@ async function continueDebate(
 ): Promise<string> {
   state.debate_round++;
 
-  if (state.debate_round > 4) {
-    // Force move to tasking after 4 rounds
-    state.state = 'TASKING';
-    state.next_action_at = randomDelay(2, 5);
-    writeState(state);
-    return 'Debate concluded (max rounds). Moving to tasking.';
-  }
+  // 3-way rotation: Carlos opens in round 1 (startDebate), then Ana, Thiago, Carlos...
+  // round 2 → junior (Ana), round 3 → mid (Thiago), round 4 → senior (Carlos), ...
+  const agentByRound: Array<'senior' | 'junior' | 'mid'> = ['senior', 'junior', 'mid'];
+  const agent = agentByRound[(state.debate_round - 1) % 3] ?? 'junior';
 
-  // Alternate between Ana and Carlos
-  // Carlos opens debate in round 1 (startDebate). Round 2 = Ana, 3 = Carlos, 4 = Ana.
-  // Even rounds → junior (Ana), odd rounds → senior (Carlos).
-  const agent: 'senior' | 'junior' = state.debate_round % 2 === 0 ? 'junior' : 'senior';
-
-  // Junior can engage but CANNOT declare consensus — only PM or senior can close the debate
   const seniorPrompt = `
 You're participating in Sprint #${state.sprint_number} planning.
 First read the existing comments on Issue #${state.planning_issue}:
@@ -476,7 +524,25 @@ Do NOT end your comment with CONSENSUS_REACHED.
 Use: gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
 `;
 
-  await runAgent(agent, agent === 'senior' ? seniorPrompt : juniorPrompt, group, chatJid, onProcess);
+  const midPrompt = `
+You're participating in Sprint #${state.sprint_number} planning.
+First read the existing comments on Issue #${state.planning_issue}:
+  gh issue view ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+
+Then add your response as a comment. You can:
+- Agree or disagree with proposals (often with strong opinions)
+- Suggest approaches you prefer (even when not asked)
+- Point out what you think is obvious or overcomplicated
+- Raise concerns (sometimes valid, sometimes just to be heard)
+
+Note: the final call on consensus belongs to the PM — not to you.
+Do NOT end your comment with CONSENSUS_REACHED.
+
+Use: gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
+`;
+
+  const promptByAgent = agent === 'senior' ? seniorPrompt : agent === 'mid' ? midPrompt : juniorPrompt;
+  await runAgent(agent, promptByAgent, group, chatJid, onProcess);
 
   // Check if orchestrator detects consensus
   const orchestratorResult = await runAgent('orchestrator', `
@@ -488,7 +554,7 @@ If yes, respond with: CONSENSUS=true
 If no, respond with: CONSENSUS=false
 `, group, chatJid, onProcess);
 
-  if (orchestratorResult.includes('CONSENSUS=true') || state.debate_round >= 3) {
+  if (orchestratorResult.includes('CONSENSUS=true') || state.debate_round >= 4) {
     state.state = 'TASKING';
     state.next_action_at = randomDelay(2, 5);
   } else {
@@ -505,6 +571,12 @@ async function startDev(
   chatJid: string,
   onProcess: (proc: ChildProcess, containerName: string) => void,
 ): Promise<string> {
+  // Build carry-over hint for orchestrator
+  const carriedOver = state.carried_over_tasks ?? [];
+  const carryOverHint = carriedOver.length > 0
+    ? `\n\nIMPORTANT: The following issues were NOT completed in the previous sprint and must be included as tasks:\n${carriedOver.map(t => `TASK|${t.issue}|${t.assignee}|${t.branch ?? ''}`).join('\n')}\n\nDo NOT create new issues for these — reuse the existing issue numbers above.`
+    : '';
+
   // Orchestrator creates individual issues from the planning discussion
   const result = await runAgent('orchestrator', `
 Read the planning Issue #${state.planning_issue} and its comments in repo ${DEVTEAM_UPSTREAM_REPO}:
@@ -512,35 +584,47 @@ Read the planning Issue #${state.planning_issue} and its comments in repo ${DEVT
 
 Based on the discussion, create 2-4 individual task Issues. For each:
 1. Create the issue with a clear title and description
-2. Add label "senior" or "junior" based on complexity (senior gets architectural tasks, junior gets UI tasks)
+2. Add label "senior", "mid", or "junior" based on complexity:
+   - senior gets architectural/backend tasks
+   - mid gets medium-complexity frontend/refactoring tasks
+   - junior gets UI tweaks and simpler tasks
 3. Assign to the appropriate developer
 
-Use: gh issue create --repo ${DEVTEAM_UPSTREAM_REPO} --title "..." --body "..." --label "senior|junior"
+Use: gh issue create --repo ${DEVTEAM_UPSTREAM_REPO} --title "..." --body "..." --label "senior|mid|junior"
 
 For each issue created, output a line:
-TASK|<issue_number>|<senior|junior>|<branch_name>
-`, group, chatJid, onProcess);
+TASK|<issue_number>|<senior|mid|junior>|<branch_name>
+${carryOverHint}`, group, chatJid, onProcess);
 
   // Parse tasks from orchestrator output
   const taskLines = result.split('\n').filter(l => l.startsWith('TASK|'));
-  state.tasks = taskLines.map(line => {
+  const parsedTasks = taskLines.map(line => {
     const [, issue, assignee, branch] = line.split('|');
+    const issueNum = parseInt(issue, 10);
+    if (isNaN(issueNum)) return null;
+    const validAssignee = (['senior', 'mid', 'junior'] as const).find(a => a === assignee) ?? 'junior';
     return {
-      issue: parseInt(issue, 10),
-      assignee: assignee as 'senior' | 'junior',
+      issue: issueNum,
+      assignee: validAssignee,
       pr: null,
       status: 'pending' as const,
-      branch: branch || null,
+      branch: branch?.trim() || null,
     };
-  });
+  }).filter((t): t is NonNullable<typeof t> => t !== null);
+
+  state.tasks = parsedTasks;
 
   // If no tasks were parsed, create defaults
   if (state.tasks.length === 0) {
     state.tasks = [
       { issue: null, assignee: 'senior', pr: null, status: 'pending', branch: null },
+      { issue: null, assignee: 'mid', pr: null, status: 'pending', branch: null },
       { issue: null, assignee: 'junior', pr: null, status: 'pending', branch: null },
     ];
   }
+
+  // Clear carried_over_tasks now that they've been merged into tasks
+  state.carried_over_tasks = undefined;
 
   state.state = 'DEV';
   state.next_action_at = randomDelay(2, 5);
@@ -579,13 +663,28 @@ async function checkDevProgress(
   // Skip malformed tasks (issue: null or invalid assignee) that may result from
   // the orchestrator agent outputting example/template lines in its TASK| output
   const pendingTask = state.tasks.find(
-    t => t.status === 'pending' && t.issue !== null && (t.assignee === 'senior' || t.assignee === 'junior'),
+    t => t.status === 'pending' && t.issue !== null &&
+      (t.assignee === 'senior' || t.assignee === 'mid' || t.assignee === 'junior'),
   );
 
   if (pendingTask) {
     const agent = pendingTask.assignee;
+
+    // Thiago erratic behavior: per-tick skip probability
+    if (agent === 'mid' && Math.random() < DEVTEAM_MID_SKIP_PROBABILITY) {
+      logger.info({ issue: pendingTask.issue }, 'DevTeam: Thiago skipped this tick (erratic behavior)');
+      state.next_action_at = randomDelay(5, 15);
+      writeState(state);
+      return `Thiago skipped working on Issue #${pendingTask.issue} this tick.`;
+    }
+
     const config = agentConfig(agent);
-    const reviewerUser = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
+    // 3-way review chain: senior → junior, mid → senior, junior → mid
+    const reviewerUser = agent === 'senior'
+      ? DEVTEAM_JUNIOR_GITHUB_USER
+      : agent === 'mid'
+        ? DEVTEAM_SENIOR_GITHUB_USER
+        : DEVTEAM_MID_GITHUB_USER;
 
     const devResult = await runAgent(agent, `
 You need to implement ONLY the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
@@ -615,7 +714,6 @@ When done, output: PR_CREATED=<number>
 
     // Log PR creation on the planning issue
     const authorUser = agentConfig(agent).user;
-    const reviewerUser2 = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
     const branchName = pendingTask.branch || `feature/issue-${pendingTask.issue}`;
     postPlanningProgress(state, [
       `## 🚀 PR Opened — Issue #${pendingTask.issue}`,
@@ -623,7 +721,7 @@ When done, output: PR_CREATED=<number>
       `- **PR:** ${pendingTask.pr ? `#${pendingTask.pr}` : '_(number not captured)_'}`,
       `- **Author:** @${authorUser} (${agent})`,
       `- **Branch:** \`${branchName}\``,
-      `- **Review requested from:** @${reviewerUser2}`,
+      `- **Review requested from:** @${reviewerUser}`,
     ].join('\n'));
 
     return `${agent} started working on Issue #${pendingTask.issue}`;
@@ -682,8 +780,12 @@ async function processReview(
   // Only increment review_round when an actual review is dispatched
   state.review_round++;
 
-  // Cross-review: the other agent reviews
-  const reviewer = needsReview.assignee === 'senior' ? 'junior' : 'senior';
+  // 3-way review chain: senior → junior, mid → senior, junior → mid
+  const reviewer = needsReview.assignee === 'senior'
+    ? 'junior'
+    : needsReview.assignee === 'mid'
+      ? 'senior'
+      : 'mid';
 
   // Decide review outcome based on probability
   const rand = Math.random();
@@ -1045,4 +1147,85 @@ async function finishSprint(state: SprintState): Promise<string> {
   writeState(state);
 
   return `Sprint #${state.sprint_number} complete. Next sprint in ~30 minutes.`;
+}
+
+async function closeSprintByTimeout(
+  state: SprintState,
+  group: RegisteredGroup,
+  chatJid: string,
+  onProcess: (proc: ChildProcess, containerName: string) => void,
+): Promise<string> {
+  // Identify unfinished tasks — all non-merged tasks are carried over
+  const pendingTasks = state.tasks.filter(t => !t.pr && t.status === 'pending');
+  const inProgressTasks = state.tasks.filter(t => !t.pr && t.status !== 'pending');
+  // Tasks with open PRs (in_review, changes_requested, approved) are also unfinished
+  const openPRTasks = state.tasks.filter(t => t.pr && t.status !== 'merged');
+
+  const carriedOver = [...pendingTasks, ...inProgressTasks, ...openPRTasks];
+
+  // Post carry-over comment on planning issue
+  if (state.planning_issue) {
+    const noWorkDone = carriedOver.length === 0;
+    const issueList = carriedOver.map(t => {
+      const prNote = t.pr ? ` (PR #${t.pr} aberto)` : '';
+      return `- #${t.issue} (${t.assignee})${prNote}`;
+    }).join('\n');
+    postPlanningProgress(state, [
+      `## ⏱️ Sprint #${state.sprint_number} Encerrado por Tempo`,
+      '',
+      `O sprint atingiu o limite de ${state.max_ticks} ticks sem que todas as tarefas fossem concluídas.`,
+      '',
+      noWorkDone
+        ? 'Todas as tarefas foram finalizadas antes do encerramento.'
+        : '### Tarefas não finalizadas (serão carried over):',
+      noWorkDone ? '' : issueList,
+      '',
+      noWorkDone ? '' : 'Estas issues serão incluídas automaticamente no planejamento do próximo sprint.',
+    ].join('\n'));
+
+    // Close the planning issue (same as finishSprint)
+    try {
+      execSync(
+        `gh issue close ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comment "Sprint #${state.sprint_number} encerrado por tempo (${state.ticks_elapsed}/${state.max_ticks} ticks). ${carriedOver.length} tarefa(s) em carry-over."`,
+        { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+      );
+    } catch (err) {
+      logger.warn({ issue: state.planning_issue, err }, 'closeSprintByTimeout: could not close planning issue');
+    }
+  }
+
+  // Archive the sprint with timeout marker
+  const historyFile = path.join(
+    PROMPTS_DIR, 'sprint-history',
+    `sprint-${String(state.sprint_number).padStart(3, '0')}.json`
+  );
+  const archiveState = { ...state, closed_by: 'timeout', carried_over_issues: carriedOver.map(t => t.issue) };
+  fs.mkdirSync(path.dirname(historyFile), { recursive: true });
+  fs.writeFileSync(historyFile, JSON.stringify(archiveState, null, 2));
+
+  logger.info(
+    { sprint: state.sprint_number, carried: carriedOver.map(t => t.issue) },
+    'DevTeam: sprint closed by timeout',
+  );
+
+  // Reset for next sprint, carrying over unfinished tasks
+  const nextSprintNumber = state.sprint_number + 1;
+  const resetState: SprintState = {
+    ...state,
+    sprint_number: nextSprintNumber,
+    state: 'IDLE',
+    planning_issue: null,
+    tasks: [],
+    task_under_review: null,
+    debate_round: 0,
+    review_round: 0,
+    ticks_elapsed: 0,
+    next_action_at: randomDelay(5, 10),
+    carried_over_tasks: carriedOver,
+    started_at: null,
+  };
+
+  writeState(resetState);
+
+  return `Sprint #${state.sprint_number} closed by timeout (${state.ticks_elapsed}/${state.max_ticks} ticks). ${carriedOver.length} task(s) carried over to sprint #${nextSprintNumber}.`;
 }
