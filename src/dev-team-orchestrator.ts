@@ -21,7 +21,7 @@ const EXTENDED_PATH = `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? '/
 
 export interface SprintTask {
   issue: number | null;
-  assignee: 'senior' | 'junior';
+  assignee: 'senior' | 'junior' | 'mid';
   pr: number | null;
   status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged';
   branch: string | null;
@@ -38,9 +38,13 @@ export interface SprintState {
   upstream_repo: string;
   senior_fork: string;
   junior_fork: string;
+  mid_fork: string;
   debate_round: number;
   review_round: number;
   task_under_review: number | null;
+  ticks_elapsed: number;
+  max_ticks: number;
+  carried_over_tasks?: SprintTask[];
 }
 
 const STATE_FILE = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
