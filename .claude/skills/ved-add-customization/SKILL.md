@@ -11,6 +11,14 @@ Run this protocol before and after every change to an upstream file. Upstream fi
 > ```bash
 > git checkout -b feat/<short-description>
 > ```
+>
+> **Exceptions — commit directly to `main` is authorized when ANY of the following applies:**
+> - **Hotfix urgente:** the change unblocks a production issue and waiting for a PR review would cause continued damage
+> - **Trivial change:** single-line or very small changes with negligible risk (e.g. one ENV var, one config flag)
+> - **Own file:** the file is not upstream (not from qwibitai/nanoclaw) — e.g. `src/dev-team-orchestrator.ts`, `src/log-viewer.ts`
+> - **Explicit user authorization:** the user explicitly says to commit directly to `main` in the current session
+>
+> Even when committing directly to `main`, all other steps still apply: markers (if upstream file), tracker update, build check.
 
 ## Step 0: Establish baseline
 
