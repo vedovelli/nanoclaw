@@ -55,6 +55,9 @@ import { startFileSender } from './file-sender.js';
 /* ved custom */
 import { startLogViewer } from './log-viewer.js';
 /* ved custom end */
+/* ved custom */
+import { buildStreamingOnOutput } from './streaming-channel.js';
+/* ved custom end */
 import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
@@ -311,38 +314,53 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   let hadError = false;
   let outputSentToUser = false;
 
+  /* ved custom */
+  const streamingOnOutput = buildStreamingOnOutput(channel, chatJid);
+  /* ved custom end */
+
   const output = await runAgent(group, prompt, chatJid, async (result) => {
     // Streaming output callback — called for each agent result
     if (result.result) {
-      const raw =
-        typeof result.result === 'string'
-          ? result.result
-          : JSON.stringify(result.result);
-      // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
-      const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-      logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
-      if (text) {
-        await channel.sendMessage(chatJid, text);
-        /* ved custom */
-        try {
-          storeMessage({
-            id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
-            chat_jid: chatJid,
-            sender: 'assistant',
-            sender_name: 'Assistant',
-            content: text,
-            timestamp: new Date().toISOString(),
-            is_from_me: true,
-            is_bot_message: true,
-          });
-        } catch {
-          // persistence is best-effort
-        }
-        /* ved custom end */
+      /* ved custom */
+      if (streamingOnOutput) {
+        // Progressive editing path: accumulate chunks into one Telegram message
+        await streamingOnOutput(result);
         outputSentToUser = true;
+        resetIdleTimer();
+      } else {
+      /* ved custom end */
+        const raw =
+          typeof result.result === 'string'
+            ? result.result
+            : JSON.stringify(result.result);
+        // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
+        const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+        logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
+        if (text) {
+          await channel.sendMessage(chatJid, text);
+          /* ved custom */
+          try {
+            storeMessage({
+              id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
+              chat_jid: chatJid,
+              sender: 'assistant',
+              sender_name: 'Assistant',
+              content: text,
+              timestamp: new Date().toISOString(),
+              is_from_me: true,
+              is_bot_message: true,
+            });
+          } catch {
+            // persistence is best-effort
+          }
+          /* ved custom end */
+          outputSentToUser = true;
+        }
+        // Only reset idle timer on actual results, not session-update markers (result: null)
+        resetIdleTimer();
+      /* ved custom */
       }
-      // Only reset idle timer on actual results, not session-update markers (result: null)
-      resetIdleTimer();
+      /* ved custom end */
     }
 
     if (result.status === 'error') {
