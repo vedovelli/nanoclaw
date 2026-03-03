@@ -3,6 +3,7 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
+  /* ved custom */ DATA_DIR, /* ved custom end */
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
@@ -46,6 +47,7 @@ import {
   storeMessage,
   /* ved custom */ getRecentExchanges, /* ved custom end */
   /* ved custom */ createTask, /* ved custom end */
+  /* ved custom */ deleteSession, /* ved custom end */
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
 /* ved custom */
@@ -376,6 +378,40 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   return true;
 }
 
+/* ved custom */
+const SESSION_SIZE_LIMIT_BYTES = 4 * 1024 * 1024; // 4 MB
+
+function rotateOversizedSession(groupFolder: string): void {
+  const sessionId = sessions[groupFolder];
+  if (!sessionId) return;
+
+  const sessionFile = path.join(
+    DATA_DIR, 'sessions', groupFolder,
+    '.claude', 'projects', '-workspace-group',
+    `${sessionId}.jsonl`,
+  );
+
+  let stat: fs.Stats;
+  try { stat = fs.statSync(sessionFile); } catch { return; }
+  if (stat.size <= SESSION_SIZE_LIMIT_BYTES) return;
+
+  const archiveDir = path.join(DATA_DIR, 'sessions', groupFolder, 'archived-sessions');
+  fs.mkdirSync(archiveDir, { recursive: true });
+  try {
+    fs.renameSync(sessionFile, path.join(archiveDir, `${sessionId}.jsonl`));
+  } catch (err) {
+    logger.warn({ err, sessionId }, 'Session rotate: failed to archive — clearing without archive');
+  }
+
+  delete (sessions as Record<string, string | undefined>)[groupFolder];
+  deleteSession(groupFolder);
+  logger.info(
+    { groupFolder, sessionId, sizeMb: (stat.size / 1024 / 1024).toFixed(1) },
+    'Session rotated: exceeded 4 MB limit, starting fresh',
+  );
+}
+/* ved custom end */
+
 async function runAgent(
   group: RegisteredGroup,
   prompt: string,
@@ -383,6 +419,7 @@ async function runAgent(
   onOutput?: (output: ContainerOutput) => Promise<void>,
 ): Promise<'success' | 'error'> {
   const isMain = group.folder === MAIN_GROUP_FOLDER;
+  /* ved custom */ rotateOversizedSession(group.folder); /* ved custom end */
   const sessionId = sessions[group.folder];
 
   // Update tasks snapshot for container to read (filtered by group)
