@@ -16,11 +16,15 @@ import {
 import { RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
+// Linear project used for all sprint/issue tracking
+const LINEAR_PROJECT = 'ai-dev-team-simulation';
+const LINEAR_TEAM = 'Fabio Vedovelli';
+
 // launchd restricts PATH to /usr/bin:/bin:/usr/sbin:/sbin — extend it so gh is found
 const EXTENDED_PATH = `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? '/usr/bin:/bin'}`;
 
 export interface SprintTask {
-  issue: number | null;
+  issue: string | null;  // Linear issue identifier, e.g. "FAB-1"
   assignee: 'senior' | 'junior';
   pr: number | null;
   status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged';
@@ -32,7 +36,7 @@ export interface SprintState {
   state: 'IDLE' | 'PLANNING' | 'DEBATE' | 'TASKING' | 'DEV' | 'REVIEW' | 'AUTHOR_FIXES' | 'MERGE' | 'COMPLETE';
   paused: boolean;
   started_at: string | null;
-  planning_issue: number | null;
+  planning_issue: string | null;  // Linear issue identifier, e.g. "FAB-1"
   tasks: SprintTask[];
   next_action_at: string | null;
   upstream_repo: string;
@@ -40,7 +44,7 @@ export interface SprintState {
   junior_fork: string;
   debate_round: number;
   review_round: number;
-  task_under_review: number | null;
+  task_under_review: string | null;  // Linear issue identifier
 }
 
 const STATE_FILE = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
@@ -71,26 +75,6 @@ function agentConfig(agent: 'senior' | 'junior') {
   return agent === 'senior'
     ? { token: DEVTEAM_SENIOR_GITHUB_TOKEN, user: DEVTEAM_SENIOR_GITHUB_USER }
     : { token: DEVTEAM_JUNIOR_GITHUB_TOKEN, user: DEVTEAM_JUNIOR_GITHUB_USER };
-}
-
-/**
- * Post a structured progress comment on the planning issue using gh CLI directly.
- * Used to build a timeline log of sprint activity on the planning issue.
- */
-function postPlanningProgress(state: SprintState, body: string): void {
-  if (!state.planning_issue) return;
-  const tmpFile = path.join(process.cwd(), 'data', 'dev-team', `.comment-${Date.now()}.md`);
-  try {
-    fs.writeFileSync(tmpFile, body, 'utf-8');
-    execSync(
-      `gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body-file ${JSON.stringify(tmpFile)}`,
-      { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
-    );
-  } catch (err) {
-    logger.warn({ issue: state.planning_issue, err }, 'DevTeam: could not post progress comment on planning issue');
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-  }
 }
 
 /**
@@ -138,7 +122,7 @@ export async function runDevTeamOrchestrator(
     case 'MERGE':
       return await processMerge(state, group, chatJid, onProcess);
     case 'COMPLETE':
-      return await finishSprint(state);
+      return await finishSprint(state, group, chatJid, onProcess);
     default:
       return `Unknown state: ${state.state}`;
   }
@@ -366,32 +350,37 @@ async function startNewSprint(
   state.debate_round = 0;
   state.review_round = 0;
 
-  // Use orchestrator (Sonnet) to create the planning issue
+  // Use orchestrator (Sonnet) to create the planning issue in Linear
   const result = await runAgent('orchestrator', `
-Create a new GitHub Issue on ${DEVTEAM_UPSTREAM_REPO} for Sprint #${state.sprint_number} planning.
+Create a new issue in the Linear project "${LINEAR_PROJECT}" (team: "${LINEAR_TEAM}") for Sprint #${state.sprint_number} planning.
 
 Title: "Sprint #${state.sprint_number} Planning"
 
-Body should include:
+Description should include:
 - A brief summary of what the team should focus on this sprint
-- A call for @${DEVTEAM_SENIOR_GITHUB_USER} and @${DEVTEAM_JUNIOR_GITHUB_USER} to propose features
+- A call for Carlos (senior) and Ana (junior) to propose features
 - Reference to previous sprints if sprint_number > 1
 
-Use: gh issue create --repo ${DEVTEAM_UPSTREAM_REPO} --title "Sprint #${state.sprint_number} Planning" --body "..."
+Use the Linear MCP to create the issue (save_issue tool). Set:
+- title: "Sprint #${state.sprint_number} Planning"
+- project: "${LINEAR_PROJECT}"
+- team: "${LINEAR_TEAM}"
+- description: <the body text above>
 
-Return the issue number in your response as: ISSUE_NUMBER=<number>
+Return the issue identifier in your response as: ISSUE_ID=<identifier>
+(e.g., ISSUE_ID=FAB-1)
 `, group, chatJid, onProcess);
 
-  // Parse issue number from result
-  const match = result.match(/ISSUE_NUMBER=(\d+)/);
+  // Parse Linear issue identifier from result
+  const match = result.match(/ISSUE_ID=([A-Z]+-\d+)/);
   if (match) {
-    state.planning_issue = parseInt(match[1], 10);
+    state.planning_issue = match[1];
   }
 
   state.next_action_at = randomDelay(3, 8);
   writeState(state);
 
-  return `Sprint #${state.sprint_number} started. Planning issue: #${state.planning_issue}`;
+  return `Sprint #${state.sprint_number} started. Planning issue: ${state.planning_issue}`;
 }
 
 async function startDebate(
@@ -406,14 +395,14 @@ async function startDebate(
   // Carlos proposes first
   await runAgent('senior', `
 You're participating in Sprint #${state.sprint_number} planning.
-Comment on Issue #${state.planning_issue} in repo ${DEVTEAM_UPSTREAM_REPO}.
+Post a comment on Linear issue ${state.planning_issue} (project: "${LINEAR_PROJECT}", team: "${LINEAR_TEAM}").
 
 Propose 2-3 features for this sprint. Consider:
 - What the app needs architecturally
 - TanStack features that could be leveraged (Router, Query, Table, Form, Virtual)
 - MSW mocks that need to be set up
 
-Use: gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
+Use the Linear MCP create_comment tool to post your proposal on issue ${state.planning_issue}.
 `, group, chatJid, onProcess);
 
   state.next_action_at = randomDelay(3, 8);
@@ -446,25 +435,25 @@ async function continueDebate(
   // Junior can engage but CANNOT declare consensus — only PM or senior can close the debate
   const seniorPrompt = `
 You're participating in Sprint #${state.sprint_number} planning.
-First read the existing comments on Issue #${state.planning_issue}:
-  gh issue view ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+First read the existing comments on Linear issue ${state.planning_issue}:
+  Use the Linear MCP list_comments tool on issue ${state.planning_issue}.
 
-Then add your response as a comment. You can:
+Then add your response as a new comment using the Linear MCP create_comment tool on issue ${state.planning_issue}.
+You can:
 - Agree with proposals and add detail
 - Counter-propose simpler/different approaches
 - Suggest modifications
 
 If you feel there's enough agreement on 2-4 tasks, end your comment with: CONSENSUS_REACHED
-
-Use: gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
 `;
 
   const juniorPrompt = `
 You're participating in Sprint #${state.sprint_number} planning.
-First read the existing comments on Issue #${state.planning_issue}:
-  gh issue view ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+First read the existing comments on Linear issue ${state.planning_issue}:
+  Use the Linear MCP list_comments tool on issue ${state.planning_issue}.
 
-Then add your response as a comment. You can:
+Then add your response as a new comment using the Linear MCP create_comment tool on issue ${state.planning_issue}.
+You can:
 - Agree with proposals and add detail
 - Counter-propose simpler/different approaches
 - Raise concerns or ask questions
@@ -472,16 +461,14 @@ Then add your response as a comment. You can:
 
 Note: the final call on when the team has reached consensus belongs to the senior dev or PM — not to you.
 Do NOT end your comment with CONSENSUS_REACHED.
-
-Use: gh issue comment ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
 `;
 
   await runAgent(agent, agent === 'senior' ? seniorPrompt : juniorPrompt, group, chatJid, onProcess);
 
   // Check if orchestrator detects consensus
   const orchestratorResult = await runAgent('orchestrator', `
-Read the comments on Issue #${state.planning_issue} in repo ${DEVTEAM_UPSTREAM_REPO}:
-  gh issue view ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+Read the comments on Linear issue ${state.planning_issue}:
+  Use the Linear MCP list_comments tool on issue ${state.planning_issue}.
 
 Analyze whether the team has reached consensus on sprint tasks.
 If yes, respond with: CONSENSUS=true
@@ -507,18 +494,20 @@ async function startDev(
 ): Promise<string> {
   // Orchestrator creates individual issues from the planning discussion
   const result = await runAgent('orchestrator', `
-Read the planning Issue #${state.planning_issue} and its comments in repo ${DEVTEAM_UPSTREAM_REPO}:
-  gh issue view ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comments
+Read the planning issue ${state.planning_issue} and its comments from Linear:
+  Use the Linear MCP get_issue tool on ${state.planning_issue}, then list_comments.
 
-Based on the discussion, create 2-4 individual task Issues. For each:
-1. Create the issue with a clear title and description
-2. Add label "senior" or "junior" based on complexity (senior gets architectural tasks, junior gets UI tasks)
-3. Assign to the appropriate developer
+Based on the discussion, create 2-4 individual task issues in Linear. For each task:
+1. Create the issue in project "${LINEAR_PROJECT}" (team: "${LINEAR_TEAM}") using save_issue
+2. Set the title clearly describing the feature
+3. Set the description with implementation details
+4. Label with "senior" or "junior" based on complexity (senior gets architectural tasks, junior gets UI tasks)
 
-Use: gh issue create --repo ${DEVTEAM_UPSTREAM_REPO} --title "..." --body "..." --label "senior|junior"
+After creating all task issues, post a comment on the planning issue ${state.planning_issue} with a table summarizing all tasks created.
 
 For each issue created, output a line:
-TASK|<issue_number>|<senior|junior>|<branch_name>
+TASK|<identifier>|<senior|junior>|<branch_name>
+(e.g., TASK|FAB-2|senior|feature/data-table)
 `, group, chatJid, onProcess);
 
   // Parse tasks from orchestrator output
@@ -526,11 +515,11 @@ TASK|<issue_number>|<senior|junior>|<branch_name>
   state.tasks = taskLines.map(line => {
     const [, issue, assignee, branch] = line.split('|');
     return {
-      issue: parseInt(issue, 10),
-      assignee: assignee as 'senior' | 'junior',
+      issue: issue?.trim() || null,
+      assignee: assignee?.trim() as 'senior' | 'junior',
       pr: null,
       status: 'pending' as const,
-      branch: branch || null,
+      branch: branch?.trim() || null,
     };
   });
 
@@ -546,26 +535,6 @@ TASK|<issue_number>|<senior|junior>|<branch_name>
   state.next_action_at = randomDelay(2, 5);
   writeState(state);
 
-  // Post sprint task list to planning issue as the first progress update
-  const taskRows = state.tasks
-    .filter(t => t.issue !== null)
-    .map(t => {
-      const user = agentConfig(t.assignee).user;
-      return `| #${t.issue} | @${user} (${t.assignee}) | 🔄 In progress |`;
-    })
-    .join('\n');
-  postPlanningProgress(state, [
-    `## 📋 Sprint #${state.sprint_number} — Tasks Created`,
-    '',
-    'Planning consensus reached. The following task issues were created:',
-    '',
-    '| Issue | Assignee | Status |',
-    '|-------|----------|--------|',
-    taskRows || '| _(none parsed)_ | — | — |',
-    '',
-    'Development phase has begun.',
-  ].join('\n'));
-
   return `Tasking complete. ${state.tasks.length} tasks created.`;
 }
 
@@ -579,7 +548,7 @@ async function checkDevProgress(
   // Skip malformed tasks (issue: null or invalid assignee) that may result from
   // the orchestrator agent outputting example/template lines in its TASK| output
   const pendingTask = state.tasks.find(
-    t => t.status === 'pending' && t.issue !== null && (t.assignee === 'senior' || t.assignee === 'junior'),
+    t => t.status === 'pending' && t.issue !== null && t.issue !== '' && (t.assignee === 'senior' || t.assignee === 'junior'),
   );
 
   if (pendingTask) {
@@ -588,18 +557,20 @@ async function checkDevProgress(
     const reviewerUser = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
 
     const devResult = await runAgent(agent, `
-You need to implement ONLY the feature described in Issue #${pendingTask.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
-Do NOT implement any other issues or features beyond what Issue #${pendingTask.issue} describes.
+You need to implement ONLY the feature described in Linear issue ${pendingTask.issue}.
+Do NOT implement any other issues or features beyond what issue ${pendingTask.issue} describes.
 
 Steps:
 1. Sync your fork: gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
 2. Clone or cd into your fork working directory
-3. Read the issue: gh issue view ${pendingTask.issue} --repo ${DEVTEAM_UPSTREAM_REPO}
+3. Read the issue from Linear: use the Linear MCP get_issue tool on ${pendingTask.issue}
 4. Create a feature branch: ${pendingTask.branch || `feature/issue-${pendingTask.issue}`}
-5. Implement ONLY what Issue #${pendingTask.issue} describes, with multiple atomic commits
+5. Implement ONLY what Linear issue ${pendingTask.issue} describes, with multiple atomic commits
 6. Push to your fork
-7. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:your-branch --title "..." --body "Closes #${pendingTask.issue}\n\n..."
+7. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:your-branch --title "..." --body "Implements Linear ${pendingTask.issue}\n\n..."
 8. Request a review from your teammate: gh pr edit <pr-number> --repo ${DEVTEAM_UPSTREAM_REPO} --add-reviewer ${reviewerUser}
+9. Post a comment on Linear issue ${pendingTask.issue} saying the PR is open (use Linear MCP create_comment)
+10. Post a comment on Linear planning issue ${state.planning_issue} noting PR created for ${pendingTask.issue} (use Linear MCP create_comment)
 
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
@@ -613,20 +584,7 @@ When done, output: PR_CREATED=<number>
     state.next_action_at = randomDelay(10, 30);
     writeState(state);
 
-    // Log PR creation on the planning issue
-    const authorUser = agentConfig(agent).user;
-    const reviewerUser2 = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
-    const branchName = pendingTask.branch || `feature/issue-${pendingTask.issue}`;
-    postPlanningProgress(state, [
-      `## 🚀 PR Opened — Issue #${pendingTask.issue}`,
-      '',
-      `- **PR:** ${pendingTask.pr ? `#${pendingTask.pr}` : '_(number not captured)_'}`,
-      `- **Author:** @${authorUser} (${agent})`,
-      `- **Branch:** \`${branchName}\``,
-      `- **Review requested from:** @${reviewerUser2}`,
-    ].join('\n'));
-
-    return `${agent} started working on Issue #${pendingTask.issue}`;
+    return `${agent} started working on Linear issue ${pendingTask.issue}`;
   }
 
   // Check if all tasks have PRs — move to review
@@ -714,6 +672,11 @@ ${shouldApprove
 Also leave 1-3 inline comments on specific lines using:
 gh api repos/${DEVTEAM_UPSTREAM_REPO}/pulls/${needsReview.pr}/comments -f body="..." -f commit_id="..." -f path="..." -F line=N
 
+Finally, post a comment on Linear planning issue ${state.planning_issue} with your review outcome:
+- PR #${needsReview.pr} reviewing Linear issue ${needsReview.issue}
+- Whether you approved or requested changes
+Use the Linear MCP create_comment tool on issue ${state.planning_issue}.
+
 Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
 `, group, chatJid, onProcess);
 
@@ -726,25 +689,10 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
     state.task_under_review = needsReview.issue;
     state.next_action_at = randomDelay(5, 15);
     writeState(state);
-    // Log review outcome on the planning issue
-    postPlanningProgress(state, [
-      `## 🔄 PR #${needsReview.pr} — Changes Requested`,
-      '',
-      `- **Reviewed by:** @${reviewerUser} (${reviewer})`,
-      `- **Outcome:** Changes requested — author must address feedback`,
-      `- **Review round:** ${state.review_round}`,
-    ].join('\n'));
     return `Review round ${state.review_round} for PR #${needsReview.pr}: changes_requested. Routing to author for fixes.`;
   }
 
-  // Reviewer approved — log and clear the under-review tracking
-  postPlanningProgress(state, [
-    `## ✅ PR #${needsReview.pr} Approved`,
-    '',
-    `- **Reviewed by:** @${reviewerUser} (${reviewer})`,
-    `- **Outcome:** Approved — ready to merge`,
-    `- **Review round:** ${state.review_round}`,
-  ].join('\n'));
+  // Reviewer approved
   state.task_under_review = null;
   state.next_action_at = randomDelay(3, 5);
 
@@ -755,7 +703,7 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
   }
 
   writeState(state);
-  return `Review round ${state.review_round} for PR #${needsReview.pr}: ${needsReview.status}`;
+  return `Review round ${state.review_round} for PR #${needsReview.pr}: ${needsReview.status}. Reviewed by @${reviewerUser}.`;
 }
 
 async function authorFixTask(
@@ -784,7 +732,7 @@ async function authorFixTask(
   let fixResult: string;
   try {
     fixResult = await runAgent(author, `
-You are the author of PR #${task.pr} for Issue #${task.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
+You are the author of PR #${task.pr} for Linear issue ${task.issue} on repo ${DEVTEAM_UPSTREAM_REPO}.
 
 A reviewer has requested changes on your PR. Your job is to read their feedback and push fixes.
 
@@ -797,6 +745,8 @@ Steps:
 5. Address ALL the review feedback by pushing additional commits to the same branch.
 6. After pushing your fixes, add a comment on the PR summarising what you changed:
    gh pr comment ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --body "..."
+7. Post a comment on Linear planning issue ${state.planning_issue} saying fixes were pushed for PR #${task.pr} (Linear issue ${task.issue}).
+   Use the Linear MCP create_comment tool on issue ${state.planning_issue}.
 
 End your response with exactly: FIXES_PUSHED=true
 `, group, chatJid, onProcess);
@@ -823,15 +773,6 @@ End your response with exactly: FIXES_PUSHED=true
   state.task_under_review = null;
   state.next_action_at = randomDelay(5, 15);
   writeState(state);
-
-  // Log fix push on the planning issue
-  const fixAuthorUser = agentConfig(author).user;
-  postPlanningProgress(state, [
-    `## 🔧 Fixes Pushed — PR #${task.pr}`,
-    '',
-    `- **Author:** @${fixAuthorUser} (${author})`,
-    `- **Status:** Fixes pushed — awaiting re-review`,
-  ].join('\n'));
 
   return `Author pushed fixes for PR #${task.pr}; returning to REVIEW.`;
 }
@@ -911,6 +852,7 @@ You must resolve the conflicts:
   }
 
   // Dispatch a single orchestrator agent to merge ALL ready PRs at once
+  const linearIssueRefs = readyToMerge.map(t => `PR #${t.pr} → Linear ${t.issue}`).join(', ');
   const mergeInstructions = readyToMerge
     .map(
       t =>
@@ -926,6 +868,9 @@ Merge all of the following approved PRs on repo ${DEVTEAM_UPSTREAM_REPO}.
 Execute each merge command in sequence and output the result line immediately after each attempt:
 
 ${mergeInstructions}
+
+After all merges, post a comment on Linear planning issue ${state.planning_issue} with a summary of what was merged: ${linearIssueRefs}.
+Use the Linear MCP create_comment tool on issue ${state.planning_issue}.
 `,
     group,
     chatJid,
@@ -935,13 +880,7 @@ ${mergeInstructions}
   for (const task of readyToMerge) {
     if (mergeResult.includes(`MERGED_${task.pr}=true`)) {
       task.status = 'merged';
-      postPlanningProgress(state, [
-        `## ✅ PR #${task.pr} Merged — Issue #${task.issue} Done`,
-        '',
-        `- **Merged by:** PM (automated)`,
-        `- **Closes:** Issue #${task.issue}`,
-      ].join('\n'));
-      tickResults.push(`PR #${task.pr} merged.`);
+      tickResults.push(`PR #${task.pr} (Linear ${task.issue}) merged.`);
     } else {
       logger.warn({ pr: task.pr, result: mergeResult }, 'Merge failed — will retry next tick');
       tickResults.push(`Merge of PR #${task.pr} failed. Will retry.`);
@@ -960,7 +899,12 @@ ${mergeInstructions}
   return tickResults.join('\n');
 }
 
-async function finishSprint(state: SprintState): Promise<string> {
+async function finishSprint(
+  state: SprintState,
+  group: RegisteredGroup,
+  chatJid: string,
+  onProcess: (proc: ChildProcess, containerName: string) => void,
+): Promise<string> {
   // Merge gate: verify all PRs are actually merged on GitHub before archiving
   const tasksWithPR = state.tasks.filter(t => t.pr !== null && t.pr !== undefined);
   const unmergedPRs: number[] = [];
@@ -989,7 +933,7 @@ async function finishSprint(state: SprintState): Promise<string> {
     return `Sprint not complete — ${unmergedPRs.length} PR(s) still unmerged: #${unmergedPRs.join(', #')}. Returning to MERGE.`;
   }
 
-  // Post sprint summary and close the planning issue
+  // Build sprint summary
   const durationMs = state.started_at ? Date.now() - new Date(state.started_at).getTime() : 0;
   const durationMin = Math.round(durationMs / 60000);
   const durationStr = durationMin >= 60
@@ -997,9 +941,10 @@ async function finishSprint(state: SprintState): Promise<string> {
     : `${durationMin}m`;
   const summaryRows = state.tasks
     .filter(t => t.issue !== null)
-    .map(t => `| #${t.issue} | @${agentConfig(t.assignee).user} | ${t.pr ? `#${t.pr}` : '—'} | ✅ Merged |`)
+    .map(t => `| ${t.issue} | @${agentConfig(t.assignee).user} | ${t.pr ? `#${t.pr}` : '—'} | ✅ Merged |`)
     .join('\n');
-  postPlanningProgress(state, [
+
+  const sprintSummary = [
     `## 🏁 Sprint #${state.sprint_number} Complete`,
     '',
     '### Summary',
@@ -1013,18 +958,20 @@ async function finishSprint(state: SprintState): Promise<string> {
     summaryRows || '| — | — | — | — |',
     '',
     'Sprint complete. The team will begin the next sprint shortly.',
-  ].join('\n'));
+  ].join('\n');
 
-  // Close the planning issue now that the sprint is done
+  // Post sprint summary to Linear and close the planning issue
   if (state.planning_issue) {
-    try {
-      execSync(
-        `gh issue close ${state.planning_issue} --repo ${DEVTEAM_UPSTREAM_REPO} --comment "Sprint #${state.sprint_number} completed. All tasks merged. Closing this planning issue."`,
-        { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
-      );
-    } catch (err) {
-      logger.warn({ issue: state.planning_issue, err }, 'finishSprint: could not close planning issue');
-    }
+    await runAgent('orchestrator', `
+Sprint #${state.sprint_number} is complete. Post the following summary as a comment on Linear issue ${state.planning_issue} and then mark the issue as completed/done.
+
+Summary to post:
+${sprintSummary}
+
+Steps:
+1. Post the summary comment using the Linear MCP create_comment tool on issue ${state.planning_issue}
+2. Mark the issue as completed using the Linear MCP save_issue tool on ${state.planning_issue} with state "Done" or "Completed"
+`, group, chatJid, onProcess);
   }
 
   // Archive sprint

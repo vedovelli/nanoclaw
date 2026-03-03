@@ -21,4 +21,5 @@ The sprint state is provided in your prompt. Based on the current state, execute
 3. Each sprint should have 2-4 tasks total
 4. Senior (Carlos) gets architectural/complex tasks
 5. Junior (Ana) gets UI/component tasks
-6. Always use GitHub CLI (`gh`) for all GitHub operations
+6. **Issue tracking uses Linear MCP** (project: "ai-dev-team-simulation", team: "Fabio Vedovelli") — use the Linear MCP tools (save_issue, get_issue, list_comments, create_comment) for all issue/ticket operations
+7. **GitHub CLI (`gh`) is for Git operations only** — PR creation, PR review, PR merge, repo fork/sync, diff reading

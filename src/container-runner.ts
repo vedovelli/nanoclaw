@@ -220,6 +220,16 @@ function buildVolumeMounts(
       readonly: false,
     });
   }
+
+  // mcp-remote OAuth token cache (used by Linear MCP and other OAuth-based MCP servers)
+  const mcpAuthDir = path.join(homeDir, '.mcp-auth');
+  if (fs.existsSync(mcpAuthDir)) {
+    mounts.push({
+      hostPath: mcpAuthDir,
+      containerPath: '/home/node/.mcp-auth',
+      readonly: false,
+    });
+  }
   /* ved custom end */
 
   // Per-group IPC namespace: each group gets its own IPC directory
