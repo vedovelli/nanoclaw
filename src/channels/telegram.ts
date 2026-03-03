@@ -363,6 +363,44 @@ export class TelegramChannel implements Channel {
     }
   }
 
+  /* ved custom */
+  async sendMessageWithId(jid: string, text: string): Promise<number | undefined> {
+    if (!this.bot) {
+      logger.warn('Telegram bot not initialized');
+      return undefined;
+    }
+
+    try {
+      const numericId = jid.replace(/^tg:/, '');
+      const MAX_LENGTH = 4096;
+
+      if (text.length <= MAX_LENGTH) {
+        const msg = await this.bot.api.sendMessage(numericId, text);
+        return msg.message_id;
+      }
+
+      // Split: send first chunk, capture ID; send remaining chunks silently
+      let firstId: number | undefined;
+      for (let i = 0; i < text.length; i += MAX_LENGTH) {
+        const msg = await this.bot.api.sendMessage(numericId, text.slice(i, i + MAX_LENGTH));
+        if (firstId === undefined) firstId = msg.message_id;
+      }
+      return firstId;
+    } catch (err) {
+      logger.error({ jid, err }, 'Failed to send Telegram message (streaming)');
+      return undefined;
+    }
+  }
+  /* ved custom end */
+
+  /* ved custom */
+  async editMessage(jid: string, messageId: number, text: string): Promise<void> {
+    if (!this.bot) return;
+    const numericId = jid.replace(/^tg:/, '');
+    await this.bot.api.editMessageText(numericId, messageId, text);
+  }
+  /* ved custom end */
+
   isConnected(): boolean {
     return this.bot !== null;
   }

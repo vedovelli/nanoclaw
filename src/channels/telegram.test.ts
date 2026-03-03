@@ -42,6 +42,7 @@ vi.mock('grammy', () => ({
       sendMessage: vi.fn().mockResolvedValue(undefined),
       sendChatAction: vi.fn().mockResolvedValue(undefined),
       getFile: vi.fn().mockResolvedValue({ file_path: 'voice/file_0.oga' }),
+      editMessageText: vi.fn().mockResolvedValue(undefined),
     };
 
     constructor(token: string) {
@@ -1017,6 +1018,106 @@ describe('TelegramChannel', () => {
     it('has name "telegram"', () => {
       const channel = new TelegramChannel('test-token', createTestOpts());
       expect(channel.name).toBe('telegram');
+    });
+  });
+
+  // --- sendMessageWithId ---
+
+  describe('sendMessageWithId', () => {
+    it('sends a message and returns its message_id', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.sendMessage.mockResolvedValue({ message_id: 42 });
+
+      const id = await channel.sendMessageWithId('tg:123', 'hello');
+
+      expect(currentBot().api.sendMessage).toHaveBeenCalledWith('123', 'hello');
+      expect(id).toBe(42);
+    });
+
+    it('splits long messages and returns the first message_id', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.sendMessage.mockResolvedValue({ message_id: 10 });
+
+      const longText = 'x'.repeat(5000); // exceeds 4096
+      const id = await channel.sendMessageWithId('tg:123', longText);
+
+      expect(currentBot().api.sendMessage).toHaveBeenCalledTimes(2);
+      expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
+        1,
+        '123',
+        'x'.repeat(4096),
+      );
+      expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
+        2,
+        '123',
+        'x'.repeat(904),
+      );
+      expect(id).toBe(10);
+    });
+
+    it('sends exactly one message at 4096 characters', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.sendMessage.mockResolvedValue({ message_id: 7 });
+
+      const exactText = 'y'.repeat(4096);
+      const id = await channel.sendMessageWithId('tg:123', exactText);
+
+      expect(currentBot().api.sendMessage).toHaveBeenCalledTimes(1);
+      expect(id).toBe(7);
+    });
+
+    it('returns undefined when bot is not initialized', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      // Don't connect — bot is null
+
+      const id = await channel.sendMessageWithId('tg:123', 'hello');
+
+      expect(id).toBeUndefined();
+    });
+  });
+
+  describe('editMessage', () => {
+    it('calls editMessageText with correct args', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.editMessageText.mockResolvedValue(undefined);
+
+      await channel.editMessage('tg:123', 42, 'updated text');
+
+      expect(currentBot().api.editMessageText).toHaveBeenCalledWith('123', 42, 'updated text');
+    });
+
+    it('throws when editMessageText rejects', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      const err = Object.assign(new Error('Bad Request: message to edit not found'), {
+        error_code: 400,
+      });
+      currentBot().api.editMessageText.mockRejectedValue(err);
+
+      await expect(channel.editMessage('tg:123', 42, 'text')).rejects.toThrow('Bad Request');
+    });
+
+    it('does nothing when bot is not initialized', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      // Don't connect — bot is null
+
+      await expect(channel.editMessage('tg:123', 42, 'updated text')).resolves.toBeUndefined();
     });
   });
 });
