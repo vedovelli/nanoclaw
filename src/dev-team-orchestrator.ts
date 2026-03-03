@@ -799,17 +799,28 @@ async function processMerge(
   for (const task of approvedTasks) {
     let reviewDecision = '';
     let mergeable = '';
+    let prState = '';
     try {
       const prInfo = execSync(
-        `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json reviewDecision,mergeable --jq '"REVIEW="+.reviewDecision+" MERGE="+.mergeable'`,
+        `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json reviewDecision,mergeable,state --jq '"REVIEW="+.reviewDecision+" MERGE="+.mergeable+" STATE="+.state'`,
         { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
       ).trim();
       const reviewMatch = prInfo.match(/REVIEW=(\w+)/);
       const mergeMatch = prInfo.match(/MERGE=(\w+)/);
+      const stateMatch = prInfo.match(/STATE=(\w+)/);
       reviewDecision = reviewMatch?.[1] ?? '';
       mergeable = mergeMatch?.[1] ?? '';
+      prState = stateMatch?.[1] ?? '';
     } catch (err) {
       logger.warn({ pr: task.pr, err }, 'processMerge: could not check PR state — skipping this tick');
+      continue;
+    }
+
+    // PR was already merged (e.g. by a previous tick whose status update was lost)
+    if (prState === 'MERGED') {
+      logger.info({ pr: task.pr }, 'processMerge: PR already merged on GitHub — updating status');
+      task.status = 'merged';
+      tickResults.push(`PR #${task.pr} (Linear ${task.issue}) already merged.`);
       continue;
     }
 
@@ -845,7 +856,15 @@ You must resolve the conflicts:
   }
 
   if (readyToMerge.length === 0) {
-    // All approved PRs had conflicts or check errors; nothing to merge this tick
+    // Check if all tasks are now merged (via pre-check discovery)
+    const allMerged = state.tasks.every(t => t.status === 'merged');
+    if (allMerged) {
+      state.state = 'COMPLETE';
+      state.next_action_at = randomDelay(1, 2);
+      writeState(state);
+      return tickResults.join('\n') + '\nAll tasks merged. Sprint complete.';
+    }
+    // Remaining PRs had conflicts or check errors; nothing to merge this tick
     state.next_action_at = randomDelay(5, 10);
     writeState(state);
     return tickResults.length > 0 ? tickResults.join('\n') : 'No PRs ready to merge this tick. Will retry.';
@@ -878,7 +897,26 @@ Use the Linear MCP create_comment tool on issue ${state.planning_issue}.
   );
 
   for (const task of readyToMerge) {
-    if (mergeResult.includes(`MERGED_${task.pr}=true`)) {
+    // First check agent output, then verify directly via GitHub API as fallback
+    let isMerged = mergeResult.includes(`MERGED_${task.pr}=true`);
+
+    if (!isMerged) {
+      // Agent output didn't confirm — check GitHub directly
+      try {
+        const prState = execSync(
+          `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json state --jq '.state'`,
+          { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+        ).trim();
+        if (prState === 'MERGED') {
+          logger.info({ pr: task.pr }, 'processMerge: agent output missed confirmation but PR is merged on GitHub');
+          isMerged = true;
+        }
+      } catch (err) {
+        logger.warn({ pr: task.pr, err }, 'processMerge: could not verify PR state on GitHub');
+      }
+    }
+
+    if (isMerged) {
       task.status = 'merged';
       tickResults.push(`PR #${task.pr} (Linear ${task.issue}) merged.`);
     } else {
