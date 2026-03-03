@@ -1019,4 +1019,45 @@ describe('TelegramChannel', () => {
       expect(channel.name).toBe('telegram');
     });
   });
+
+  // --- sendMessageWithId ---
+
+  describe('sendMessageWithId', () => {
+    it('sends a message and returns its message_id', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.sendMessage.mockResolvedValue({ message_id: 42 });
+
+      const id = await channel.sendMessageWithId('tg:123', 'hello');
+
+      expect(currentBot().api.sendMessage).toHaveBeenCalledWith('123', 'hello');
+      expect(id).toBe(42);
+    });
+
+    it('splits long messages and returns the first message_id', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.sendMessage.mockResolvedValue({ message_id: 10 });
+
+      const longText = 'x'.repeat(5000); // exceeds 4096
+      const id = await channel.sendMessageWithId('tg:123', longText);
+
+      expect(currentBot().api.sendMessage).toHaveBeenCalledTimes(2);
+      expect(id).toBe(10);
+    });
+
+    it('returns undefined when bot is not initialized', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      // Don't connect — bot is null
+
+      const id = await channel.sendMessageWithId('tg:123', 'hello');
+
+      expect(id).toBeUndefined();
+    });
+  });
 });
