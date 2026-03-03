@@ -24,16 +24,13 @@ export function buildStreamingOnOutput(
 ): ((output: ContainerOutput) => Promise<void>) | null {
   if (!isStreamingCapable(channel)) return null;
 
-  const streaming = channel as Channel & StreamingCapable;
   let streamMsgId: number | undefined;
   let streamAccumulated = '';
 
   return async (output: ContainerOutput) => {
     if (!output.result) return;
 
-    const raw = typeof output.result === 'string'
-      ? output.result
-      : JSON.stringify(output.result);
+    const raw = output.result;
 
     // Strip <internal> blocks — same logic as processGroupMessages
     const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
@@ -42,9 +39,10 @@ export function buildStreamingOnOutput(
     const separator = streamAccumulated ? '\n\n' : '';
     const candidate = streamAccumulated + separator + text;
 
-    // If adding the new chunk would overflow the Telegram limit, start fresh
+    // Chunk would overflow the current message — start a new Telegram message.
+    // The previous message's content is already visible to the user; only the new chunk goes here.
     if (candidate.length > MAX_TELEGRAM_LENGTH) {
-      const newId = await streaming.sendMessageWithId(jid, text);
+      const newId = await channel.sendMessageWithId(jid, text);
       streamMsgId = newId;
       streamAccumulated = text;
       return;
@@ -54,15 +52,15 @@ export function buildStreamingOnOutput(
 
     if (streamMsgId === undefined) {
       // First chunk — send new message
-      const newId = await streaming.sendMessageWithId(jid, streamAccumulated);
+      const newId = await channel.sendMessageWithId(jid, streamAccumulated);
       streamMsgId = newId;
     } else {
       // Subsequent chunk — edit existing message
       try {
-        await streaming.editMessage(jid, streamMsgId, streamAccumulated);
+        await channel.editMessage(jid, streamMsgId, streamAccumulated);
       } catch (err) {
         logger.warn({ jid, streamMsgId, err }, 'editMessage failed, starting new message');
-        const newId = await streaming.sendMessageWithId(jid, text);
+        const newId = await channel.sendMessageWithId(jid, text);
         streamMsgId = newId;
         streamAccumulated = text;
       }

@@ -99,6 +99,7 @@ describe('buildStreamingOnOutput', () => {
 
       expect(channel.sendMessageWithId).toHaveBeenCalledTimes(2);
       expect(channel.editMessage).toHaveBeenCalledTimes(2);
+      expect(channel.editMessage).toHaveBeenLastCalledWith(JID, 20, 'second\n\nthird');
     });
   });
 
