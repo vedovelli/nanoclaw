@@ -17,10 +17,42 @@ Read these files to orient yourself:
 - `src/index.ts` — `processGroupMessages` function (lines 249–376), particularly the `onOutput` callback
 - `docs/plans/2026-03-03-telegram-streaming-design.md` — approved design doc
 
-**Critical: every new or modified block in `src/` MUST be wrapped in `/* ved custom */` ... `/* ved custom end */` markers. No exceptions.**
+**Critical: every new or modified block in upstream `src/` files MUST be wrapped in `/* ved custom */` ... `/* ved custom end */` markers. No exceptions. New files you create from scratch (`src/streaming-channel.ts`, test files) do NOT need markers.**
 
 Run tests with: `npx vitest run <file>`
 Run typecheck with: `npm run typecheck`
+
+---
+
+## Task 0: Pre-flight (HARD REQUIREMENT — do this first)
+
+**This task must complete before writing any code.**
+
+### Step 1: Create feature branch
+
+```bash
+git checkout -b feat/telegram-streaming
+```
+
+### Step 2: Capture baseline build and test results
+
+```bash
+npm run build && npm run test
+```
+
+Record:
+- **Build:** passed / failed (note any pre-existing errors)
+- **Tests:** N passed, N failed (note any pre-existing failures by name)
+
+If baseline is broken, stop and surface to user before continuing.
+
+### Step 3: Read the customizations tracker
+
+Use `mcp__basic-memory-cloud__read_note` with:
+- identifier: `nanoclaw/nano-claw-custom-modifications-tracker`
+- project: `nanoclaw`
+
+Note what's already customized in `src/channels/telegram.ts` and `src/index.ts` so you don't duplicate or conflict. The next sequential customization number is **#21**.
 
 ---
 
@@ -644,6 +676,115 @@ Compare against the known count. The number should be **higher** than before (ne
 ```bash
 git add -A
 git commit -m "chore: verify telegram streaming smoke test passed"
+```
+
+---
+
+## Task 6: Tracker update, PR and review
+
+### Step 1: Verify ved custom marker count
+
+```bash
+grep -rn "ved custom" src/ container/ --include="*.ts" --include="Dockerfile" --include="*.sh" | wc -l
+```
+
+The count must be **higher** than the baseline from Task 0. If it decreased, a marker is missing — fix before continuing.
+
+### Step 2: Update the customizations tracker — main table
+
+Use `mcp__basic-memory-cloud__edit_note` (operation: `find_replace`) on `nanoclaw/nano-claw-custom-modifications-tracker` (project: `nanoclaw`).
+
+Add a new row to the "Active Customizations" table:
+
+```
+| 21 | [Telegram Message Streaming](nanoclaw/customizations/21-telegram-streaming) | feat/telegram-streaming | `src/channels/telegram.ts`, `src/index.ts` | Low |
+```
+
+### Step 3: Create individual customization note
+
+Use `mcp__basic-memory-cloud__write_note`:
+- **title:** `21 — Telegram Message Streaming`
+- **directory:** `nanoclaw/customizations`
+- **project:** `nanoclaw`
+
+Content:
+
+```markdown
+# Telegram Message Streaming
+
+**PR/Branch:** feat/telegram-streaming (open)
+**Re-apply difficulty:** Low
+
+## O que faz
+Substitui o envio de múltiplas mensagens Telegram por edição progressiva de uma única mensagem.
+O primeiro chunk envia uma nova mensagem e captura o message_id; chunks subsequentes editam essa
+mensagem acumulando o texto — UX similar ao ChatGPT web. Canais sem suporte fazem fallback automático.
+
+## Arquivos
+- `src/channels/telegram.ts` — **MODIFICADO** — adicionados `sendMessageWithId` e `editMessage` com markers
+- `src/index.ts` — **MODIFICADO** — `processGroupMessages` usa `buildStreamingOnOutput` via duck-typing
+- `src/streaming-channel.ts` — **NOVO** — utilitário com `isStreamingCapable` e `buildStreamingOnOutput`
+- `src/streaming-channel.test.ts` — **NOVO** — testes unitários do utilitário
+- `src/channels/telegram.test.ts` — **NOVO** — testes unitários dos métodos de streaming
+
+## Notas de re-apply
+- Duck-typing: não toca na interface `Channel` upstream (`src/types.ts`)
+- Os 3 arquivos novos são locais — não precisam de markers
+- A lógica de acumulação (overflow 4096, recovery de editMessage falha) vive em `src/streaming-channel.ts`
+- Ao fazer re-apply após sync: restaurar os 2 blocos `ved custom` em `telegram.ts` e o bloco de wiring em `index.ts`
+```
+
+### Step 4: Update Conflict Risk table in tracker
+
+Add `src/channels/telegram.ts` risk entry — use `find_replace` to update the row:
+
+```
+| `src/channels/telegram.ts` | Low | #2, #4, #15, #21 |
+```
+
+And `src/index.ts`:
+
+```
+| `src/index.ts` | High | #1, #4, #9, #11, #15, #21 |
+```
+
+### Step 5: Final build and test
+
+```bash
+npm run build && npm run test
+```
+
+Must match or improve the Task 0 baseline. Fix any regressions before creating the PR.
+
+### Step 6: Push and create PR
+
+```bash
+git push -u origin feat/telegram-streaming
+```
+
+```bash
+PR_URL=$(gh pr create \
+  --title "feat: Telegram message streaming (progressive edit)" \
+  --body "$(cat <<'EOF'
+## Summary
+
+- Add \`sendMessageWithId\` to \`TelegramChannel\` — sends message and returns Telegram message_id
+- Add \`editMessage\` to \`TelegramChannel\` — edits existing message, swallows 400 not-found errors
+- Add \`src/streaming-channel.ts\` — \`buildStreamingOnOutput\` factory that accumulates chunks and edits progressively
+- Wire \`buildStreamingOnOutput\` into \`processGroupMessages\` via duck-typing — non-Telegram channels fall back automatically
+
+## Test Plan
+
+- [x] \`npm run build\` passes
+- [x] \`npm run test\` — all tests passing
+- [ ] Manual: send a message that generates a multi-chunk response in Telegram and verify single growing message
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)")
+PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+gh pr comment "$PR_NUMBER" --body "@claude please review this pull request"
+echo "PR: $PR_URL"
 ```
 
 ---
