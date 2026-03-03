@@ -47,8 +47,9 @@ describe('buildStreamingOnOutput', () => {
       channel.sendMessageWithId.mockResolvedValue(42);
 
       const handler = buildStreamingOnOutput(channel, JID);
-      await handler!(makeOutput('hello'));
+      const didSend = await handler!(makeOutput('hello'));
 
+      expect(didSend).toBe(true);
       expect(channel.sendMessageWithId).toHaveBeenCalledWith(JID, 'hello');
       expect(channel.editMessage).not.toHaveBeenCalled();
     });
@@ -60,9 +61,11 @@ describe('buildStreamingOnOutput', () => {
       channel.sendMessageWithId.mockResolvedValue(42);
 
       const handler = buildStreamingOnOutput(channel, JID);
-      await handler!(makeOutput('first'));
-      await handler!(makeOutput('second'));
+      const didSend1 = await handler!(makeOutput('first'));
+      const didSend2 = await handler!(makeOutput('second'));
 
+      expect(didSend1).toBe(true);
+      expect(didSend2).toBe(true);
       expect(channel.editMessage).toHaveBeenCalledWith(JID, 42, 'first\n\nsecond');
     });
   });
@@ -75,10 +78,13 @@ describe('buildStreamingOnOutput', () => {
         .mockResolvedValueOnce(2);
 
       const handler = buildStreamingOnOutput(channel, JID);
-      await handler!(makeOutput('x'.repeat(4000))); // first message, id=1
-      await handler!(makeOutput('y'.repeat(200)));  // would push to 4200+separator, exceeds limit → new message, id=2
-      await handler!(makeOutput('small'));           // edits message 2
+      const r1 = await handler!(makeOutput('x'.repeat(4000))); // first message, id=1
+      const r2 = await handler!(makeOutput('y'.repeat(200)));  // would push to 4200+separator, exceeds limit → new message, id=2
+      const r3 = await handler!(makeOutput('small'));           // edits message 2
 
+      expect(r1).toBe(true);
+      expect(r2).toBe(true);
+      expect(r3).toBe(true);
       expect(channel.sendMessageWithId).toHaveBeenCalledTimes(2);
       expect(channel.editMessage).toHaveBeenLastCalledWith(JID, 2, expect.stringContaining('small'));
     });
@@ -93,10 +99,13 @@ describe('buildStreamingOnOutput', () => {
       channel.editMessage.mockRejectedValueOnce(new Error('not found'));
 
       const handler = buildStreamingOnOutput(channel, JID);
-      await handler!(makeOutput('first'));   // sends → id=10
-      await handler!(makeOutput('second')); // edit fails → sends new → id=20
-      await handler!(makeOutput('third'));  // edits id=20
+      const r1 = await handler!(makeOutput('first'));   // sends → id=10
+      const r2 = await handler!(makeOutput('second')); // edit fails → sends new → id=20
+      const r3 = await handler!(makeOutput('third'));  // edits id=20
 
+      expect(r1).toBe(true);
+      expect(r2).toBe(true);
+      expect(r3).toBe(true);
       expect(channel.sendMessageWithId).toHaveBeenCalledTimes(2);
       expect(channel.editMessage).toHaveBeenCalledTimes(2);
       expect(channel.editMessage).toHaveBeenLastCalledWith(JID, 20, 'second\n\nthird');
@@ -107,16 +116,18 @@ describe('buildStreamingOnOutput', () => {
     it('skips chunks with only whitespace', async () => {
       const channel = makeStreamingChannel();
       const handler = buildStreamingOnOutput(channel, JID);
-      await handler!(makeOutput('   '));
+      const didSend = await handler!(makeOutput('   '));
 
+      expect(didSend).toBe(false);
       expect(channel.sendMessageWithId).not.toHaveBeenCalled();
     });
 
     it('strips <internal> blocks and skips if nothing remains', async () => {
       const channel = makeStreamingChannel();
       const handler = buildStreamingOnOutput(channel, JID);
-      await handler!(makeOutput('<internal>reasoning</internal>'));
+      const didSend = await handler!(makeOutput('<internal>reasoning</internal>'));
 
+      expect(didSend).toBe(false);
       expect(channel.sendMessageWithId).not.toHaveBeenCalled();
     });
   });
@@ -133,8 +144,9 @@ describe('buildStreamingOnOutput', () => {
     it('skips output with null result', async () => {
       const channel = makeStreamingChannel();
       const handler = buildStreamingOnOutput(channel, JID);
-      await handler!(makeOutput(null));
+      const didSend = await handler!(makeOutput(null));
 
+      expect(didSend).toBe(false);
       expect(channel.sendMessageWithId).not.toHaveBeenCalled();
     });
   });

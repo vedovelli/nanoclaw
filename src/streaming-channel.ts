@@ -21,20 +21,20 @@ export function isStreamingCapable(ch: Channel): ch is Channel & StreamingCapabl
 export function buildStreamingOnOutput(
   channel: Channel,
   jid: string,
-): ((output: ContainerOutput) => Promise<void>) | null {
+): ((output: ContainerOutput) => Promise<boolean>) | null {
   if (!isStreamingCapable(channel)) return null;
 
   let streamMsgId: number | undefined;
   let streamAccumulated = '';
 
-  return async (output: ContainerOutput) => {
-    if (!output.result) return;
+  return async (output: ContainerOutput): Promise<boolean> => {
+    if (!output.result) return false;
 
     const raw = output.result;
 
     // Strip <internal> blocks — same logic as processGroupMessages
     const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-    if (!text) return;
+    if (!text) return false;
 
     const separator = streamAccumulated ? '\n\n' : '';
     const candidate = streamAccumulated + separator + text;
@@ -45,7 +45,7 @@ export function buildStreamingOnOutput(
       const newId = await channel.sendMessageWithId(jid, text);
       streamMsgId = newId;
       streamAccumulated = text;
-      return;
+      return true;
     }
 
     streamAccumulated = candidate;
@@ -65,5 +65,6 @@ export function buildStreamingOnOutput(
         streamAccumulated = text;
       }
     }
+    return true;
   };
 }

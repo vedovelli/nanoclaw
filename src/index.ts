@@ -324,9 +324,11 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       /* ved custom */
       if (streamingOnOutput) {
         // Progressive editing path: accumulate chunks into one Telegram message
-        await streamingOnOutput(result);
-        outputSentToUser = true;
-        resetIdleTimer();
+        const didSend = await streamingOnOutput(result);
+        if (didSend) {
+          outputSentToUser = true;
+          resetIdleTimer();
+        }
       } else {
       /* ved custom end */
         const raw =
