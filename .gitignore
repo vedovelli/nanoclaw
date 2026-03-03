@@ -39,4 +39,3 @@ artifacts/
 
 # Git worktrees
 .worktrees/
-.dmux/
