@@ -391,6 +391,7 @@ export class TelegramChannel implements Channel {
       return undefined;
     }
   }
+  /* ved custom end */
 
   /* ved custom */
   async editMessage(jid: string, messageId: number, text: string): Promise<void> {
@@ -404,7 +405,6 @@ export class TelegramChannel implements Channel {
       // Swallow — caller handles recovery
     }
   }
-  /* ved custom end */
   /* ved custom end */
 
   isConnected(): boolean {
