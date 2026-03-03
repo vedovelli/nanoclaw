@@ -488,8 +488,9 @@ async function runQuery(
           url: 'https://devvis.com.br/mcp-reader/mcp?customer_key=b1df051607857effb39f781294d36d37aad4d929a0b9e6e81989ea3e6a6bcb71',
         },
         linear: {
-          command: 'npx',
-          args: ['-y', 'mcp-remote@0.1.37', 'https://mcp.linear.app/mcp'],
+          type: 'http' as const,
+          url: 'https://mcp.linear.app/mcp',
+          headers: { Authorization: `Bearer ${sdkEnv.LINEAR_API_KEY || ''}` },
         },
         /* ved custom end */
       },

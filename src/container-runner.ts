@@ -293,6 +293,7 @@ function readSecrets(): Record<string, string> {
     'GITHUB_PERSONAL_ACCESS_TOKEN',
     'FLARE_API_TOKEN',
     'BASIC_MEMORY_API_KEY',
+    'LINEAR_API_KEY',
   ]); /* ved custom end */
 }
 
