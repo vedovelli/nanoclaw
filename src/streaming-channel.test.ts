@@ -47,7 +47,7 @@ describe('buildStreamingOnOutput', () => {
       channel.sendMessageWithId.mockResolvedValue(42);
 
       const handler = buildStreamingOnOutput(channel, JID);
-      const didSend = await handler!(makeOutput('hello'));
+      const didSend = await handler!.onOutput(makeOutput('hello'));
 
       expect(didSend).toBe(true);
       expect(channel.sendMessageWithId).toHaveBeenCalledWith(JID, 'hello');
@@ -61,8 +61,8 @@ describe('buildStreamingOnOutput', () => {
       channel.sendMessageWithId.mockResolvedValue(42);
 
       const handler = buildStreamingOnOutput(channel, JID);
-      const didSend1 = await handler!(makeOutput('first'));
-      const didSend2 = await handler!(makeOutput('second'));
+      const didSend1 = await handler!.onOutput(makeOutput('first'));
+      const didSend2 = await handler!.onOutput(makeOutput('second'));
 
       expect(didSend1).toBe(true);
       expect(didSend2).toBe(true);
@@ -78,9 +78,9 @@ describe('buildStreamingOnOutput', () => {
         .mockResolvedValueOnce(2);
 
       const handler = buildStreamingOnOutput(channel, JID);
-      const r1 = await handler!(makeOutput('x'.repeat(4000))); // first message, id=1
-      const r2 = await handler!(makeOutput('y'.repeat(200)));  // would push to 4200+separator, exceeds limit → new message, id=2
-      const r3 = await handler!(makeOutput('small'));           // edits message 2
+      const r1 = await handler!.onOutput(makeOutput('x'.repeat(4000))); // first message, id=1
+      const r2 = await handler!.onOutput(makeOutput('y'.repeat(200)));  // would push to 4200+separator, exceeds limit → new message, id=2
+      const r3 = await handler!.onOutput(makeOutput('small'));           // edits message 2
 
       expect(r1).toBe(true);
       expect(r2).toBe(true);
@@ -99,9 +99,9 @@ describe('buildStreamingOnOutput', () => {
       channel.editMessage.mockRejectedValueOnce(new Error('not found'));
 
       const handler = buildStreamingOnOutput(channel, JID);
-      const r1 = await handler!(makeOutput('first'));   // sends → id=10
-      const r2 = await handler!(makeOutput('second')); // edit fails → sends new → id=20
-      const r3 = await handler!(makeOutput('third'));  // edits id=20
+      const r1 = await handler!.onOutput(makeOutput('first'));   // sends → id=10
+      const r2 = await handler!.onOutput(makeOutput('second')); // edit fails → sends new → id=20
+      const r3 = await handler!.onOutput(makeOutput('third'));  // edits id=20
 
       expect(r1).toBe(true);
       expect(r2).toBe(true);
@@ -116,7 +116,7 @@ describe('buildStreamingOnOutput', () => {
     it('skips chunks with only whitespace', async () => {
       const channel = makeStreamingChannel();
       const handler = buildStreamingOnOutput(channel, JID);
-      const didSend = await handler!(makeOutput('   '));
+      const didSend = await handler!.onOutput(makeOutput('   '));
 
       expect(didSend).toBe(false);
       expect(channel.sendMessageWithId).not.toHaveBeenCalled();
@@ -125,7 +125,7 @@ describe('buildStreamingOnOutput', () => {
     it('strips <internal> blocks and skips if nothing remains', async () => {
       const channel = makeStreamingChannel();
       const handler = buildStreamingOnOutput(channel, JID);
-      const didSend = await handler!(makeOutput('<internal>reasoning</internal>'));
+      const didSend = await handler!.onOutput(makeOutput('<internal>reasoning</internal>'));
 
       expect(didSend).toBe(false);
       expect(channel.sendMessageWithId).not.toHaveBeenCalled();
@@ -144,10 +144,23 @@ describe('buildStreamingOnOutput', () => {
     it('skips output with null result', async () => {
       const channel = makeStreamingChannel();
       const handler = buildStreamingOnOutput(channel, JID);
-      const didSend = await handler!(makeOutput(null));
+      const didSend = await handler!.onOutput(makeOutput(null));
 
       expect(didSend).toBe(false);
       expect(channel.sendMessageWithId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAccumulated', () => {
+    it('returns the accumulated text after chunks', async () => {
+      const channel = makeStreamingChannel();
+      channel.sendMessageWithId.mockResolvedValue(1);
+
+      const streaming = buildStreamingOnOutput(channel, JID);
+      await streaming!.onOutput(makeOutput('first'));
+      await streaming!.onOutput(makeOutput('second'));
+
+      expect(streaming!.getAccumulated()).toBe('first\n\nsecond');
     });
   });
 });

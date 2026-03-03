@@ -1099,14 +1099,17 @@ describe('TelegramChannel', () => {
       expect(currentBot().api.editMessageText).toHaveBeenCalledWith('123', 42, 'updated text');
     });
 
-    it('does not throw when message is not found (400 error)', async () => {
+    it('throws when editMessageText rejects', async () => {
       const opts = createTestOpts();
       const channel = new TelegramChannel('test-token', opts);
       await channel.connect();
 
-      currentBot().api.editMessageText.mockRejectedValue(new Error('Bad Request: message to edit not found'));
+      const err = Object.assign(new Error('Bad Request: message to edit not found'), {
+        error_code: 400,
+      });
+      currentBot().api.editMessageText.mockRejectedValue(err);
 
-      await expect(channel.editMessage('tg:123', 42, 'updated text')).resolves.toBeUndefined();
+      await expect(channel.editMessage('tg:123', 42, 'text')).rejects.toThrow('Bad Request');
     });
 
     it('does nothing when bot is not initialized', async () => {

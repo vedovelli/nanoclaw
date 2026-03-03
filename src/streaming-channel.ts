@@ -21,13 +21,13 @@ export function isStreamingCapable(ch: Channel): ch is Channel & StreamingCapabl
 export function buildStreamingOnOutput(
   channel: Channel,
   jid: string,
-): ((output: ContainerOutput) => Promise<boolean>) | null {
+): { onOutput: (output: ContainerOutput) => Promise<boolean>; getAccumulated: () => string } | null {
   if (!isStreamingCapable(channel)) return null;
 
   let streamMsgId: number | undefined;
   let streamAccumulated = '';
 
-  return async (output: ContainerOutput): Promise<boolean> => {
+  const onOutput = async (output: ContainerOutput): Promise<boolean> => {
     if (!output.result) return false;
 
     const raw = output.result;
@@ -67,4 +67,6 @@ export function buildStreamingOnOutput(
     }
     return true;
   };
+
+  return { onOutput, getAccumulated: () => streamAccumulated };
 }

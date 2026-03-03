@@ -324,7 +324,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       /* ved custom */
       if (streamingOnOutput) {
         // Progressive editing path: accumulate chunks into one Telegram message
-        const didSend = await streamingOnOutput(result);
+        const didSend = await streamingOnOutput.onOutput(result);
         if (didSend) {
           outputSentToUser = true;
           resetIdleTimer();
@@ -372,6 +372,28 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
+
+  /* ved custom */
+  if (streamingOnOutput) {
+    const accumulated = streamingOnOutput.getAccumulated();
+    if (accumulated) {
+      try {
+        storeMessage({
+          id: `bot-${new Date().toISOString()}-${Math.random().toString(36).slice(2)}`,
+          chat_jid: chatJid,
+          sender: 'assistant',
+          sender_name: 'Assistant',
+          content: accumulated,
+          timestamp: new Date().toISOString(),
+          is_from_me: true,
+          is_bot_message: true,
+        });
+      } catch {
+        // persistence is best-effort
+      }
+    }
+  }
+  /* ved custom end */
 
   if (output === 'error' || hadError) {
     // If we already sent output to the user, don't roll back the cursor —
