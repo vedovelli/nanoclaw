@@ -391,6 +391,20 @@ export class TelegramChannel implements Channel {
       return undefined;
     }
   }
+
+  /* ved custom */
+  async editMessage(jid: string, messageId: number, text: string): Promise<void> {
+    if (!this.bot) return;
+
+    try {
+      const numericId = jid.replace(/^tg:/, '');
+      await this.bot.api.editMessageText(numericId, messageId, text);
+    } catch (err) {
+      logger.warn({ jid, messageId, err }, 'Failed to edit Telegram message (streaming)');
+      // Swallow — caller handles recovery
+    }
+  }
+  /* ved custom end */
   /* ved custom end */
 
   isConnected(): boolean {

@@ -42,6 +42,7 @@ vi.mock('grammy', () => ({
       sendMessage: vi.fn().mockResolvedValue(undefined),
       sendChatAction: vi.fn().mockResolvedValue(undefined),
       getFile: vi.fn().mockResolvedValue({ file_path: 'voice/file_0.oga' }),
+      editMessageText: vi.fn().mockResolvedValue(undefined),
     };
 
     constructor(token: string) {
@@ -1082,6 +1083,38 @@ describe('TelegramChannel', () => {
       const id = await channel.sendMessageWithId('tg:123', 'hello');
 
       expect(id).toBeUndefined();
+    });
+  });
+
+  describe('editMessage', () => {
+    it('calls editMessageText with correct args', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.editMessageText.mockResolvedValue(undefined);
+
+      await channel.editMessage('tg:123', 42, 'updated text');
+
+      expect(currentBot().api.editMessageText).toHaveBeenCalledWith('123', 42, 'updated text');
+    });
+
+    it('does not throw when message is not found (400 error)', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.editMessageText.mockRejectedValue(new Error('Bad Request: message to edit not found'));
+
+      await expect(channel.editMessage('tg:123', 42, 'updated text')).resolves.toBeUndefined();
+    });
+
+    it('does nothing when bot is not initialized', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      // Don't connect — bot is null
+
+      await expect(channel.editMessage('tg:123', 42, 'updated text')).resolves.toBeUndefined();
     });
   });
 });
