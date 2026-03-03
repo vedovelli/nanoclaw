@@ -1047,7 +1047,31 @@ describe('TelegramChannel', () => {
       const id = await channel.sendMessageWithId('tg:123', longText);
 
       expect(currentBot().api.sendMessage).toHaveBeenCalledTimes(2);
+      expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
+        1,
+        '123',
+        'x'.repeat(4096),
+      );
+      expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
+        2,
+        '123',
+        'x'.repeat(904),
+      );
       expect(id).toBe(10);
+    });
+
+    it('sends exactly one message at 4096 characters', async () => {
+      const opts = createTestOpts();
+      const channel = new TelegramChannel('test-token', opts);
+      await channel.connect();
+
+      currentBot().api.sendMessage.mockResolvedValue({ message_id: 7 });
+
+      const exactText = 'y'.repeat(4096);
+      const id = await channel.sendMessageWithId('tg:123', exactText);
+
+      expect(currentBot().api.sendMessage).toHaveBeenCalledTimes(1);
+      expect(id).toBe(7);
     });
 
     it('returns undefined when bot is not initialized', async () => {
