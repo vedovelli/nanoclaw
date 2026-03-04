@@ -29,6 +29,7 @@ export interface SprintTask {
   pr: number | null;
   status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged';
   branch: string | null;
+  merge_attempts?: number;  // count of failed merge attempts; pauses sprint after 3
 }
 
 export interface SprintState {
@@ -567,7 +568,7 @@ Steps:
 4. Create a feature branch: ${pendingTask.branch || `feature/issue-${pendingTask.issue}`}
 5. Implement ONLY what Linear issue ${pendingTask.issue} describes, with multiple atomic commits
 6. Push to your fork
-7. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:your-branch --title "..." --body "Implements Linear ${pendingTask.issue}\n\n..."
+7. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:${pendingTask.branch || `feature/issue-${pendingTask.issue}`} --title "..." --body "Implements Linear ${pendingTask.issue}\n\n..."
 8. Request a review from your teammate: gh pr edit <pr-number> --repo ${DEVTEAM_UPSTREAM_REPO} --add-reviewer ${reviewerUser}
 9. Post a comment on Linear issue ${pendingTask.issue} saying the PR is open (use Linear MCP create_comment)
 10. Post a comment on Linear planning issue ${state.planning_issue} noting PR created for ${pendingTask.issue} (use Linear MCP create_comment)
@@ -575,16 +576,57 @@ Steps:
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
 
-    // Parse PR number from agent output so REVIEW and MERGE can reference it
+    // Parse PR number from agent output and validate it exists on upstream
     const prMatch = devResult.match(/PR_CREATED=(\d+)/);
-    if (prMatch) {
-      pendingTask.pr = parseInt(prMatch[1], 10);
+    const candidatePr = prMatch ? parseInt(prMatch[1], 10) : null;
+
+    let confirmedPr: number | null = null;
+    if (candidatePr !== null) {
+      // Verify the PR actually exists on the upstream repo
+      try {
+        execSync(
+          `gh pr view ${candidatePr} --repo ${DEVTEAM_UPSTREAM_REPO} --json number`,
+          { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+        );
+        confirmedPr = candidatePr;
+      } catch {
+        logger.warn({ pr: candidatePr, repo: DEVTEAM_UPSTREAM_REPO }, 'checkDevProgress: PR not found on upstream — searching by branch');
+      }
     }
-    pendingTask.status = 'pr_created';
+
+    // Fallback: search for an open PR by branch name on upstream
+    if (confirmedPr === null && pendingTask.branch) {
+      try {
+        const branchName = pendingTask.branch.split('/').pop() ?? pendingTask.branch;
+        const found = execSync(
+          `gh pr list --repo ${DEVTEAM_UPSTREAM_REPO} --state open --json number,headRefName --jq '[.[] | select(.headRefName | test("${branchName}"))] | first | .number // empty'`,
+          { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+        ).trim();
+        if (found && /^\d+$/.test(found)) {
+          confirmedPr = parseInt(found, 10);
+          logger.info({ pr: confirmedPr, branch: branchName }, 'checkDevProgress: found PR on upstream by branch name');
+        }
+      } catch (err) {
+        logger.warn({ err }, 'checkDevProgress: branch search failed');
+      }
+    }
+
+    if (confirmedPr !== null) {
+      pendingTask.pr = confirmedPr;
+      pendingTask.status = 'pr_created';
+      logger.info({ pr: confirmedPr, issue: pendingTask.issue }, 'checkDevProgress: PR confirmed on upstream');
+    } else {
+      // PR not found on upstream — reset to pending so it retries next tick
+      logger.warn({ candidatePr, issue: pendingTask.issue }, 'checkDevProgress: could not confirm PR on upstream — resetting to pending');
+      pendingTask.status = 'pending';
+    }
+
     state.next_action_at = randomDelay(10, 30);
     writeState(state);
 
-    return `${agent} started working on Linear issue ${pendingTask.issue}`;
+    return confirmedPr !== null
+      ? `${agent} created PR #${confirmedPr} for Linear issue ${pendingTask.issue}`
+      : `${agent} finished work on ${pendingTask.issue} but PR not found on upstream — will retry`;
   }
 
   // Check if all tasks have PRs — move to review
@@ -870,59 +912,60 @@ You must resolve the conflicts:
     return tickResults.length > 0 ? tickResults.join('\n') : 'No PRs ready to merge this tick. Will retry.';
   }
 
-  // Dispatch a single orchestrator agent to merge ALL ready PRs at once
-  const linearIssueRefs = readyToMerge.map(t => `PR #${t.pr} → Linear ${t.issue}`).join(', ');
-  const mergeInstructions = readyToMerge
-    .map(
-      t =>
-        `gh pr merge ${t.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --squash --delete-branch\n` +
-        `Output exactly: MERGED_${t.pr}=true on success, MERGED_${t.pr}=false on failure (include error on next line).`,
-    )
-    .join('\n\n');
-
-  const mergeResult = await runAgent(
-    'orchestrator',
-    `
-Merge all of the following approved PRs on repo ${DEVTEAM_UPSTREAM_REPO}.
-Execute each merge command in sequence and output the result line immediately after each attempt:
-
-${mergeInstructions}
-
-After all merges, post a comment on Linear planning issue ${state.planning_issue} with a summary of what was merged: ${linearIssueRefs}.
-Use the Linear MCP create_comment tool on issue ${state.planning_issue}.
-`,
-    group,
-    chatJid,
-    onProcess,
-  );
-
+  // Merge directly via execSync — no LLM needed for a deterministic gh command
+  const mergedRefs: string[] = [];
   for (const task of readyToMerge) {
-    // First check agent output, then verify directly via GitHub API as fallback
-    let isMerged = mergeResult.includes(`MERGED_${task.pr}=true`);
-
-    if (!isMerged) {
-      // Agent output didn't confirm — check GitHub directly
+    let isMerged = false;
+    try {
+      execSync(
+        `gh pr merge ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --squash --delete-branch`,
+        { encoding: 'utf8', timeout: 30000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
+      );
+      isMerged = true;
+    } catch (mergeErr) {
+      // execSync failed — check if it was actually merged anyway (race condition / already merged)
       try {
         const prState = execSync(
           `gh pr view ${task.pr} --repo ${DEVTEAM_UPSTREAM_REPO} --json state --jq '.state'`,
           { encoding: 'utf8', timeout: 15000, env: { ...process.env, PATH: EXTENDED_PATH, GH_TOKEN: DEVTEAM_PM_GITHUB_TOKEN } },
         ).trim();
-        if (prState === 'MERGED') {
-          logger.info({ pr: task.pr }, 'processMerge: agent output missed confirmation but PR is merged on GitHub');
-          isMerged = true;
+        isMerged = prState === 'MERGED';
+        if (isMerged) {
+          logger.info({ pr: task.pr }, 'processMerge: merge cmd failed but PR already merged on GitHub');
         }
-      } catch (err) {
-        logger.warn({ pr: task.pr, err }, 'processMerge: could not verify PR state on GitHub');
+      } catch {
+        // ignore secondary check failure
+      }
+      if (!isMerged) {
+        logger.warn({ pr: task.pr, err: mergeErr }, 'processMerge: merge failed');
       }
     }
 
     if (isMerged) {
       task.status = 'merged';
+      task.merge_attempts = 0;
       tickResults.push(`PR #${task.pr} (Linear ${task.issue}) merged.`);
+      mergedRefs.push(`PR #${task.pr} → Linear ${task.issue}`);
     } else {
-      logger.warn({ pr: task.pr, result: mergeResult }, 'Merge failed — will retry next tick');
-      tickResults.push(`Merge of PR #${task.pr} failed. Will retry.`);
+      task.merge_attempts = (task.merge_attempts ?? 0) + 1;
+      tickResults.push(`Merge of PR #${task.pr} failed (attempt ${task.merge_attempts}).`);
+      if (task.merge_attempts >= 3) {
+        logger.error({ pr: task.pr, issue: task.issue }, 'processMerge: 3 consecutive merge failures — pausing sprint');
+        state.paused = true;
+        tickResults.push(`Sprint paused: PR #${task.pr} failed to merge 3 times. Manual intervention required.`);
+      }
     }
+  }
+
+  // Post Linear comment summarising what was merged (fire-and-forget agent call)
+  if (mergedRefs.length > 0 && state.planning_issue) {
+    runAgent(
+      'orchestrator',
+      `Post a comment on Linear planning issue ${state.planning_issue} summarising what was merged: ${mergedRefs.join(', ')}. Use the Linear MCP create_comment tool.`,
+      group,
+      chatJid,
+      onProcess,
+    ).catch(err => logger.warn({ err }, 'processMerge: failed to post Linear merge comment'));
   }
 
   const remaining = state.tasks.filter(t => t.status !== 'merged');
