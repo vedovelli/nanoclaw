@@ -80,31 +80,31 @@ Store the key capabilities and differentiators from both PRDs in memory.
 
 ```bash
 gh api repos/faros-ai/faros-community-edition/releases \
-  -f per_page=5 \
-  --jq '[.[] | {tag: .tag_name, published: .published_at, body: .body}]'
+  -f per_page=10 \
+  --jq '[.[] | select(.published_at >= "'$YESTERDAY'") | {tag: .tag_name, published: .published_at, body: .body}]'
 ```
 
 **b) GitHub releases (airbyte-connectors):**
 
 ```bash
 gh api repos/faros-ai/airbyte-connectors/releases \
-  -f per_page=5 \
-  --jq '[.[] | {tag: .tag_name, published: .published_at, body: .body}]'
+  -f per_page=10 \
+  --jq '[.[] | select(.published_at >= "'$YESTERDAY'") | {tag: .tag_name, published: .published_at, body: .body}]'
 ```
 
-**c) Recently merged PRs (last 48h — cast wider net to avoid missing daily gaps):**
+**c) Recently merged PRs (last 24h only):**
 
 ```bash
 gh api repos/faros-ai/faros-community-edition/pulls \
   --method GET \
   -f state=closed \
   -f per_page=20 \
-  --jq '[.[] | select(.merged_at != null) | {title: .title, merged: .merged_at, labels: [.labels[].name]}]'
+  --jq '[.[] | select(.merged_at != null and .merged_at >= "'$YESTERDAY'") | {title: .title, merged: .merged_at, labels: [.labels[].name]}]'
 ```
 
 **d) Blog — new posts:**
 
-Use `agent-browser` to fetch `https://faros.ai/blog`. Extract post titles, dates, and URLs. Identify any post published on or after $YESTERDAY.
+Use `agent-browser` to fetch `https://faros.ai/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY — do not treat old posts as new findings.
 
 **e) Clara product page:**
 
@@ -127,7 +127,7 @@ Jellyfish is closed source — no GitHub to query. Use browser only.
 
 **a) Blog — new posts:**
 
-Use `agent-browser` to fetch `https://jellyfish.co/blog`. Extract post titles, dates, and URLs. Identify any post published on or after $YESTERDAY.
+Use `agent-browser` to fetch `https://jellyfish.co/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY — do not treat old posts as new findings.
 
 **b) AI Impact Dashboard page:**
 
