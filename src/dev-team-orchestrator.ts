@@ -503,6 +503,7 @@ Based on the discussion, create 2-4 individual task issues in Linear. For each t
 2. Set the title clearly describing the feature
 3. Set the description with implementation details
 4. Label with "senior" or "junior" based on complexity (senior gets architectural tasks, junior gets UI tasks)
+5. Immediately after creating each issue, set its status to "Todo" using save_issue with stateName "Todo"
 
 After creating all task issues, post a comment on the planning issue ${state.planning_issue} with a table summarizing all tasks created.
 
@@ -562,16 +563,17 @@ You need to implement ONLY the feature described in Linear issue ${pendingTask.i
 Do NOT implement any other issues or features beyond what issue ${pendingTask.issue} describes.
 
 Steps:
-1. Sync your fork: gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
-2. Clone or cd into your fork working directory
-3. Read the issue from Linear: use the Linear MCP get_issue tool on ${pendingTask.issue}
-4. Create a feature branch: ${pendingTask.branch || `feature/issue-${pendingTask.issue}`}
-5. Implement ONLY what Linear issue ${pendingTask.issue} describes, with multiple atomic commits
-6. Push to your fork
-7. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:${pendingTask.branch || `feature/issue-${pendingTask.issue}`} --title "..." --body "Implements Linear ${pendingTask.issue}\n\n..."
-8. Request a review from your teammate: gh pr edit <pr-number> --repo ${DEVTEAM_UPSTREAM_REPO} --add-reviewer ${reviewerUser}
-9. Post a comment on Linear issue ${pendingTask.issue} saying the PR is open (use Linear MCP create_comment)
-10. Post a comment on Linear planning issue ${state.planning_issue} noting PR created for ${pendingTask.issue} (use Linear MCP create_comment)
+1. Mark Linear issue ${pendingTask.issue} as "In Progress" using the Linear MCP save_issue tool with stateName "In Progress"
+2. Sync your fork: gh repo sync ${config.user}/${DEVTEAM_UPSTREAM_REPO.split('/')[1]} --force
+3. Clone or cd into your fork working directory
+4. Read the issue from Linear: use the Linear MCP get_issue tool on ${pendingTask.issue}
+5. Create a feature branch: ${pendingTask.branch || `feature/issue-${pendingTask.issue}`}
+6. Implement ONLY what Linear issue ${pendingTask.issue} describes, with multiple atomic commits
+7. Push to your fork
+8. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:${pendingTask.branch || `feature/issue-${pendingTask.issue}`} --title "..." --body "Implements Linear ${pendingTask.issue}\n\n..."
+9. Request a review from your teammate: gh pr edit <pr-number> --repo ${DEVTEAM_UPSTREAM_REPO} --add-reviewer ${reviewerUser}
+10. Post a comment on Linear issue ${pendingTask.issue} saying the PR is open (use Linear MCP create_comment)
+11. Post a comment on Linear planning issue ${state.planning_issue} noting PR created for ${pendingTask.issue} (use Linear MCP create_comment)
 
 When done, output: PR_CREATED=<number>
 `, group, chatJid, onProcess);
@@ -957,15 +959,18 @@ You must resolve the conflicts:
     }
   }
 
-  // Post Linear comment summarising what was merged (fire-and-forget agent call)
+  // Mark merged tasks as Done and post Linear summary comment (fire-and-forget)
   if (mergedRefs.length > 0 && state.planning_issue) {
+    const mergedIssues = readyToMerge.filter(t => t.status === 'merged').map(t => t.issue).filter(Boolean);
     runAgent(
       'orchestrator',
-      `Post a comment on Linear planning issue ${state.planning_issue} summarising what was merged: ${mergedRefs.join(', ')}. Use the Linear MCP create_comment tool.`,
+      `Do the following in order:
+1. For each of these Linear issues, set the status to "Done" using save_issue with stateName "Done": ${mergedIssues.join(', ')}
+2. Post a comment on Linear planning issue ${state.planning_issue} summarising what was merged: ${mergedRefs.join(', ')}. Use the Linear MCP create_comment tool.`,
       group,
       chatJid,
       onProcess,
-    ).catch(err => logger.warn({ err }, 'processMerge: failed to post Linear merge comment'));
+    ).catch(err => logger.warn({ err }, 'processMerge: failed to update Linear statuses after merge'));
   }
 
   const remaining = state.tasks.filter(t => t.status !== 'merged');
@@ -1041,17 +1046,18 @@ async function finishSprint(
     'Sprint complete. The team will begin the next sprint shortly.',
   ].join('\n');
 
-  // Post sprint summary to Linear and close the planning issue
+  // Post sprint summary to Linear, mark all tasks and planning issue as Done
   if (state.planning_issue) {
+    const taskIssues = state.tasks.map(t => t.issue).filter(Boolean);
     await runAgent('orchestrator', `
-Sprint #${state.sprint_number} is complete. Post the following summary as a comment on Linear issue ${state.planning_issue} and then mark the issue as completed/done.
+Sprint #${state.sprint_number} is complete. Do the following in order:
 
-Summary to post:
+1. Mark each of these task issues as "Done" using save_issue with stateName "Done": ${taskIssues.join(', ')}
+2. Post the following summary as a comment on Linear issue ${state.planning_issue} using create_comment:
+
 ${sprintSummary}
 
-Steps:
-1. Post the summary comment using the Linear MCP create_comment tool on issue ${state.planning_issue}
-2. Mark the issue as completed using the Linear MCP save_issue tool on ${state.planning_issue} with state "Done" or "Completed"
+3. Mark the planning issue ${state.planning_issue} as "Done" using save_issue with stateName "Done"
 `, group, chatJid, onProcess);
   }
 
