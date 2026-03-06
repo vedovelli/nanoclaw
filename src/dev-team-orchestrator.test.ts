@@ -75,4 +75,30 @@ describe('DevTeam Orchestrator', () => {
     expect(state.dysfunctionMode).toBe(false);
     readSpy.mockRestore();
   });
+
+  it('runAgent selects ana-dysfunction-prompt when dysfunctionMode is true', async () => {
+    const { runContainerAgent } = await import('./container-runner.js');
+    const { runAgent } = await import('./dev-team-orchestrator.js');
+    vi.mocked(runContainerAgent).mockClear();
+    vi.mocked(runContainerAgent).mockResolvedValueOnce({ status: 'success', result: 'done' } as any);
+
+    const readFileSpy = vi.spyOn(fs, 'readFileSync').mockImplementation((filePath: any) => {
+      const p = String(filePath);
+      if (p.endsWith('ana-dysfunction-prompt.md')) return '# Ana Dysfunction Prompt';
+      if (p.endsWith('ana-prompt.md')) return '# Ana Normal Prompt';
+      if (p.endsWith('carlos-prompt.md')) return '# Carlos Prompt';
+      if (p.endsWith('orchestrator-prompt.md')) return '# Orchestrator Prompt';
+      if (p.endsWith('sprint-state.json')) return JSON.stringify({ ...BASE_STATE, dysfunctionMode: false });
+      return '';
+    });
+
+    const mockGroup = { folder: 'background', name: 'background' } as any;
+    await runAgent('junior', 'do something', mockGroup, 'test-jid', vi.fn(), true);
+
+    const calls = readFileSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((p) => p.endsWith('ana-dysfunction-prompt.md'))).toBe(true);
+    expect(calls.some((p) => p.endsWith('ana-prompt.md'))).toBe(false);
+
+    readFileSpy.mockRestore();
+  });
 });

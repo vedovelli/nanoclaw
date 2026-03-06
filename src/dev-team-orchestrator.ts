@@ -131,12 +131,13 @@ export async function runDevTeamOrchestrator(
   }
 }
 
-async function runAgent(
+export async function runAgent(
   agent: 'senior' | 'junior' | 'orchestrator',
   prompt: string,
   group: RegisteredGroup,
   chatJid: string,
   onProcess: (proc: ChildProcess, containerName: string) => void,
+  dysfunctionMode = false,
 ): Promise<string> {
   const config = agent === 'orchestrator'
     ? { token: DEVTEAM_PM_GITHUB_TOKEN, user: DEVTEAM_PM_GITHUB_USER }
@@ -144,7 +145,13 @@ async function runAgent(
 
   const systemPrompt = agent === 'orchestrator'
     ? readPrompt('orchestrator-prompt.md')
-    : readPrompt(agent === 'senior' ? 'carlos-prompt.md' : 'ana-prompt.md');
+    : readPrompt(
+        agent === 'senior'
+          ? 'carlos-prompt.md'
+          : dysfunctionMode
+            ? 'ana-dysfunction-prompt.md'
+            : 'ana-prompt.md',
+      );
 
   const fullPrompt = `${systemPrompt}\n\n---\n\n## Current Task\n\n${prompt}`;
 
