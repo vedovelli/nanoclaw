@@ -147,4 +147,52 @@ describe('DevTeam Orchestrator', () => {
     readSpy.mockRestore();
     writeSpy.mockRestore();
   });
+
+  it('processReview skips junior reviewer and auto-advances when dysfunctionMode is true', async () => {
+    const { runContainerAgent } = await import('./container-runner.js');
+    vi.mocked(runContainerAgent).mockClear();
+
+    const stateInReview = {
+      ...BASE_STATE,
+      state: 'REVIEW' as const,
+      dysfunctionMode: true,
+      review_round: 0,
+      senior_fork: 'carlos-test/repo',
+      junior_fork: 'ana-test/repo',
+      tasks: [
+        {
+          issue: 'FAB-2',
+          assignee: 'senior' as const,  // Carlos's task — reviewer would be Ana (junior)
+          status: 'pr_created' as const,
+          branch: 'feature/fab-2',
+          pr: 42,
+          merge_attempts: 0,
+        },
+      ],
+    };
+
+    const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify(stateInReview) as any
+    );
+    const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+
+    const mockGroup = { folder: 'background', name: 'background' } as any;
+    const { runDevTeamOrchestrator } = await import('./dev-team-orchestrator.js');
+    const result = await runDevTeamOrchestrator(mockGroup, 'test-jid', vi.fn());
+
+    // Ana should NOT be dispatched
+    expect(runContainerAgent).not.toHaveBeenCalled();
+    // Result should mention the skip
+    expect(result).toContain('skipped');
+
+    // Written state should have the task as 'approved' and sprint moved to 'MERGE'
+    const writeCall = writeSpy.mock.calls.find(c => String(c[0]).endsWith('sprint-state.json'));
+    expect(writeCall).toBeDefined();
+    const writtenState = JSON.parse(writeCall![1] as string);
+    expect(writtenState.tasks[0].status).toBe('approved');
+    expect(writtenState.state).toBe('MERGE');
+
+    readSpy.mockRestore();
+    writeSpy.mockRestore();
+  });
 });

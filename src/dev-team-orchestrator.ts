@@ -675,7 +675,9 @@ async function processReview(
 
   if (!needsReview) {
     // Check if all approved
-    const allApproved = state.tasks.every(t => t.status === 'approved' || t.status === 'merged');
+    const allApproved = state.tasks.every(
+      t => t.status === 'approved' || t.status === 'merged' || t.status === 'skipped_dysfunction'
+    );
     if (allApproved) {
       state.state = 'MERGE';
       state.next_action_at = randomDelay(3, 5);
@@ -697,11 +699,24 @@ async function processReview(
     return 'Waiting for PRs to review.';
   }
 
-  // Only increment review_round when an actual review is dispatched
-  state.review_round++;
-
   // Cross-review: the other agent reviews
   const reviewer = needsReview.assignee === 'senior' ? 'junior' : 'senior';
+
+  if (state.dysfunctionMode && reviewer === 'junior') {
+    // Skip review — Ana is disengaged. Do NOT increment review_round (no real review happened).
+    needsReview.status = 'approved';
+    state.task_under_review = null;
+    const allApproved = state.tasks.every(
+      t => t.status === 'approved' || t.status === 'merged' || t.status === 'skipped_dysfunction'
+    );
+    if (allApproved) state.state = 'MERGE';
+    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return `Review skipped for PR #${needsReview.pr} — Ana is in dysfunction mode. Auto-advanced.`;
+  }
+
+  // Only increment review_round when an actual review is dispatched
+  state.review_round++;
 
   // Decide review outcome based on probability
   const rand = Math.random();
@@ -738,7 +753,7 @@ Finally, post a comment on Linear planning issue ${state.planning_issue} with yo
 Use the Linear MCP create_comment tool on issue ${state.planning_issue}.
 
 Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
-`, group, chatJid, onProcess);
+`, group, chatJid, onProcess, state.dysfunctionMode);
 
   needsReview.status = shouldApprove ? 'approved' : 'changes_requested';
   const reviewerUser = agentConfig(reviewer).user;
@@ -757,7 +772,9 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
   state.next_action_at = randomDelay(3, 5);
 
   // Check if all tasks are approved
-  const allApproved = state.tasks.every(t => t.status === 'approved' || t.status === 'merged');
+  const allApproved = state.tasks.every(
+    t => t.status === 'approved' || t.status === 'merged' || t.status === 'skipped_dysfunction'
+  );
   if (allApproved) {
     state.state = 'MERGE';
   }
