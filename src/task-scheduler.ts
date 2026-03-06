@@ -31,6 +31,7 @@ import { logger } from './logger.js';
 import { RegisteredGroup, ScheduledTask } from './types.js';
 /* ved custom */
 import { runDevTeamOrchestrator } from './dev-team-orchestrator.js';
+import { runSentryMonitor } from './sentry-monitor.js';
 /* ved custom end */
 
 export interface SchedulerDependencies {
@@ -191,6 +192,41 @@ async function runTask(
         error,
       });
       const nextRun = new Date(Date.now() + parseInt(task.schedule_value, 10)).toISOString();
+      updateTaskAfterRun(task.id, nextRun, `Error: ${error.slice(0, 150)}`);
+    }
+    return;
+  }
+  /* ved custom end */
+
+  /* ved custom */
+  if (task.prompt === '__SENTRY_ISSUES__') {
+    try {
+      const result = await runSentryMonitor(task.chat_jid, deps.sendMessage);
+      logTaskRun({
+        task_id: task.id,
+        run_at: new Date().toISOString(),
+        duration_ms: Date.now() - startTime,
+        status: 'success',
+        result: result.slice(0, 200),
+        error: null,
+      });
+      const nextRun = new Date(
+        Date.now() + parseInt(task.schedule_value, 10),
+      ).toISOString();
+      updateTaskAfterRun(task.id, nextRun, result.slice(0, 200));
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      logTaskRun({
+        task_id: task.id,
+        run_at: new Date().toISOString(),
+        duration_ms: Date.now() - startTime,
+        status: 'error',
+        result: null,
+        error,
+      });
+      const nextRun = new Date(
+        Date.now() + parseInt(task.schedule_value, 10),
+      ).toISOString();
       updateTaskAfterRun(task.id, nextRun, `Error: ${error.slice(0, 150)}`);
     }
     return;
