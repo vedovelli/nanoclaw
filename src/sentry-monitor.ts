@@ -34,13 +34,13 @@ export async function runSentryMonitor(
 ): Promise<string> {
   if (!SENTRY_ACCESS_TOKEN) {
     const msg = 'Sentry monitor error: SENTRY_ACCESS_TOKEN is not configured.';
-    await sendMessage(chatJid, msg);
+    try { await sendMessage(chatJid, msg); } catch { /* best-effort */ }
     return 'error: missing token';
   }
 
   if (!SENTRY_ORG_SLUG) {
     const msg = 'Sentry monitor error: SENTRY_ORG_SLUG is not configured.';
-    await sendMessage(chatJid, msg);
+    try { await sendMessage(chatJid, msg); } catch { /* best-effort */ }
     return 'error: missing org slug';
   }
 
@@ -60,18 +60,23 @@ export async function runSentryMonitor(
 
     if (!response.ok) {
       const msg = `Sentry monitor error: API returned ${response.status}.`;
-      await sendMessage(chatJid, msg);
+      try { await sendMessage(chatJid, msg); } catch { /* best-effort */ }
       return `error: HTTP ${response.status}`;
     }
 
-    issues = (await response.json()) as SentryIssue[];
+    const raw = await response.json();
+    if (!Array.isArray(raw)) {
+      try { await sendMessage(chatJid, 'Sentry monitor error: unexpected API response shape.'); } catch { /* best-effort */ }
+      return 'error: unexpected shape';
+    }
+    issues = raw as SentryIssue[];
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await sendMessage(chatJid, `Sentry monitor error: ${message}`);
+    try { await sendMessage(chatJid, `Sentry monitor error: ${message}`); } catch { /* best-effort */ }
     return `error: ${message}`;
   }
 
   const text = formatIssues(issues);
-  await sendMessage(chatJid, text);
+  try { await sendMessage(chatJid, text); } catch { /* best-effort */ }
   return `${issues.length} issues`;
 }
