@@ -27,7 +27,7 @@ export interface SprintTask {
   issue: string | null;  // Linear issue identifier, e.g. "FAB-1"
   assignee: 'senior' | 'junior';
   pr: number | null;
-  status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged';
+  status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged' | 'skipped_dysfunction';
   branch: string | null;
   merge_attempts?: number;  // count of failed merge attempts; pauses sprint after 3
 }
@@ -46,14 +46,16 @@ export interface SprintState {
   debate_round: number;
   review_round: number;
   task_under_review: string | null;  // Linear issue identifier
+  dysfunctionMode: boolean;
 }
 
 const STATE_FILE = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
 const PROMPTS_DIR = path.join(process.cwd(), 'data', 'dev-team');
 
-function readState(): SprintState {
+export function readState(): SprintState {
   const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
   state.task_under_review = state.task_under_review ?? null;
+  state.dysfunctionMode = state.dysfunctionMode ?? false;
   return state;
 }
 
@@ -129,12 +131,13 @@ export async function runDevTeamOrchestrator(
   }
 }
 
-async function runAgent(
+export async function runAgent(
   agent: 'senior' | 'junior' | 'orchestrator',
   prompt: string,
   group: RegisteredGroup,
   chatJid: string,
   onProcess: (proc: ChildProcess, containerName: string) => void,
+  dysfunctionMode = false,
 ): Promise<string> {
   const config = agent === 'orchestrator'
     ? { token: DEVTEAM_PM_GITHUB_TOKEN, user: DEVTEAM_PM_GITHUB_USER }
@@ -142,7 +145,13 @@ async function runAgent(
 
   const systemPrompt = agent === 'orchestrator'
     ? readPrompt('orchestrator-prompt.md')
-    : readPrompt(agent === 'senior' ? 'carlos-prompt.md' : 'ana-prompt.md');
+    : readPrompt(
+        agent === 'senior'
+          ? 'carlos-prompt.md'
+          : dysfunctionMode
+            ? 'ana-dysfunction-prompt.md'
+            : 'ana-prompt.md',
+      );
 
   const fullPrompt = `${systemPrompt}\n\n---\n\n## Current Task\n\n${prompt}`;
 
@@ -554,6 +563,13 @@ async function checkDevProgress(
   );
 
   if (pendingTask) {
+    if (state.dysfunctionMode && pendingTask.assignee === 'junior') {
+      pendingTask.status = 'skipped_dysfunction';
+      state.next_action_at = randomDelay(5, 15);
+      writeState(state);
+      return `Ana skipped task ${pendingTask.issue} (dysfunction mode)`;
+    }
+
     const agent = pendingTask.assignee;
     const config = agentConfig(agent);
     const reviewerUser = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
@@ -570,13 +586,14 @@ Steps:
 5. Create a feature branch: ${pendingTask.branch || `feature/issue-${pendingTask.issue}`}
 6. Implement ONLY what Linear issue ${pendingTask.issue} describes, with multiple atomic commits
 7. Push to your fork
-8. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:${pendingTask.branch || `feature/issue-${pendingTask.issue}`} --title "..." --body "Implements Linear ${pendingTask.issue}\n\n..."
+8. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:${pendingTask.branch || `feature/issue-${pendingTask.issue}`} --title "..." --body "Implements Linear ${pendingTask.issue}\\n\\n..."
 9. Request a review from your teammate: gh pr edit <pr-number> --repo ${DEVTEAM_UPSTREAM_REPO} --add-reviewer ${reviewerUser}
 10. Post a comment on Linear issue ${pendingTask.issue} saying the PR is open (use Linear MCP create_comment)
 11. Post a comment on Linear planning issue ${state.planning_issue} noting PR created for ${pendingTask.issue} (use Linear MCP create_comment)
 
 When done, output: PR_CREATED=<number>
-`, group, chatJid, onProcess);
+// dysfunctionMode passed so senior agent uses the normal carlos-prompt (flag is ignored for senior).
+    `, group, chatJid, onProcess, state.dysfunctionMode);
 
     // Parse PR number from agent output and validate it exists on upstream
     const prMatch = devResult.match(/PR_CREATED=(\d+)/);
@@ -659,7 +676,9 @@ async function processReview(
 
   if (!needsReview) {
     // Check if all approved
-    const allApproved = state.tasks.every(t => t.status === 'approved' || t.status === 'merged');
+    const allApproved = state.tasks.every(
+      t => t.status === 'approved' || t.status === 'merged' || t.status === 'skipped_dysfunction'
+    );
     if (allApproved) {
       state.state = 'MERGE';
       state.next_action_at = randomDelay(3, 5);
@@ -681,11 +700,27 @@ async function processReview(
     return 'Waiting for PRs to review.';
   }
 
-  // Only increment review_round when an actual review is dispatched
-  state.review_round++;
-
   // Cross-review: the other agent reviews
   const reviewer = needsReview.assignee === 'senior' ? 'junior' : 'senior';
+
+  if (state.dysfunctionMode && reviewer === 'junior') {
+    // Skip review — Ana is disengaged. Do NOT increment review_round (no real review happened).
+    // NOTE: We set sprint-internal status to 'approved' so the sprint can advance to MERGE.
+    // This does NOT reflect GitHub state — gh pr review --approve is never called, so Ana's
+    // review count on the actual PR remains zero. That's the DevVis signal: PR with no review from Ana.
+    needsReview.status = 'approved';
+    state.task_under_review = null;
+    const allApproved = state.tasks.every(
+      t => t.status === 'approved' || t.status === 'merged' || t.status === 'skipped_dysfunction'
+    );
+    if (allApproved) state.state = 'MERGE';
+    state.next_action_at = randomDelay(3, 5);
+    writeState(state);
+    return `Review skipped for PR #${needsReview.pr} — Ana is in dysfunction mode. Auto-advanced.`;
+  }
+
+  // Only increment review_round when an actual review is dispatched
+  state.review_round++;
 
   // Decide review outcome based on probability
   const rand = Math.random();
@@ -722,7 +757,7 @@ Finally, post a comment on Linear planning issue ${state.planning_issue} with yo
 Use the Linear MCP create_comment tool on issue ${state.planning_issue}.
 
 Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
-`, group, chatJid, onProcess);
+`, group, chatJid, onProcess, state.dysfunctionMode);
 
   needsReview.status = shouldApprove ? 'approved' : 'changes_requested';
   const reviewerUser = agentConfig(reviewer).user;
@@ -741,7 +776,9 @@ Output: REVIEW_RESULT=${shouldApprove ? 'approved' : 'changes_requested'}
   state.next_action_at = randomDelay(3, 5);
 
   // Check if all tasks are approved
-  const allApproved = state.tasks.every(t => t.status === 'approved' || t.status === 'merged');
+  const allApproved = state.tasks.every(
+    t => t.status === 'approved' || t.status === 'merged' || t.status === 'skipped_dysfunction'
+  );
   if (allApproved) {
     state.state = 'MERGE';
   }
