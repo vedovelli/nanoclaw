@@ -261,16 +261,14 @@ server.tool(
   },
   async (args) => {
     // Validate schedule_value if provided
-    if (args.schedule_type === 'cron' || (!args.schedule_type && args.schedule_value)) {
-      if (args.schedule_value) {
-        try {
-          CronExpressionParser.parse(args.schedule_value);
-        } catch {
-          return {
-            content: [{ type: 'text' as const, text: `Invalid cron: "${args.schedule_value}".` }],
-            isError: true,
-          };
-        }
+    if (args.schedule_type === 'cron' && args.schedule_value) {
+      try {
+        CronExpressionParser.parse(args.schedule_value);
+      } catch {
+        return {
+          content: [{ type: 'text' as const, text: `Invalid cron: "${args.schedule_value}".` }],
+          isError: true,
+        };
       }
     }
     if (args.schedule_type === 'interval' && args.schedule_value) {
