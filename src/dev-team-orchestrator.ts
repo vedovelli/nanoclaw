@@ -563,7 +563,7 @@ async function checkDevProgress(
   );
 
   if (pendingTask) {
-    if (state.dysfunctionMode && pendingTask.assignee === 'junior') {
+    if (state.dysfunctionMode && pendingTask.assignee === 'junior' && Math.random() < 0.6) {
       pendingTask.status = 'skipped_dysfunction';
       state.next_action_at = randomDelay(5, 15);
       writeState(state);
@@ -703,7 +703,7 @@ async function processReview(
   // Cross-review: the other agent reviews
   const reviewer = needsReview.assignee === 'senior' ? 'junior' : 'senior';
 
-  if (state.dysfunctionMode && reviewer === 'junior') {
+  if (state.dysfunctionMode && reviewer === 'junior' && Math.random() < 0.6) {
     // Skip review — Ana is disengaged. Do NOT increment review_round (no real review happened).
     // NOTE: We set sprint-internal status to 'approved' so the sprint can advance to MERGE.
     // This does NOT reflect GitHub state — gh pr review --approve is never called, so Ana's

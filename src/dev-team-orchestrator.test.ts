@@ -107,6 +107,7 @@ describe('DevTeam Orchestrator', () => {
   it('checkDevProgress skips junior task and does not call runContainerAgent when dysfunctionMode is true', async () => {
     const { runContainerAgent } = await import('./container-runner.js');
     vi.mocked(runContainerAgent).mockClear();
+    const mathRandomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1); // force skip (0.1 < 0.6)
 
     const stateWithDysfunction = {
       ...BASE_STATE,
@@ -146,11 +147,13 @@ describe('DevTeam Orchestrator', () => {
 
     readSpy.mockRestore();
     writeSpy.mockRestore();
+    mathRandomSpy.mockRestore();
   });
 
   it('processReview skips junior reviewer and auto-advances when dysfunctionMode is true', async () => {
     const { runContainerAgent } = await import('./container-runner.js');
     vi.mocked(runContainerAgent).mockClear();
+    const mathRandomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1); // force skip (0.1 < 0.6)
 
     const stateInReview = {
       ...BASE_STATE,
@@ -194,5 +197,6 @@ describe('DevTeam Orchestrator', () => {
 
     readSpy.mockRestore();
     writeSpy.mockRestore();
+    mathRandomSpy.mockRestore();
   });
 });
