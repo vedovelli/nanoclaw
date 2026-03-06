@@ -26,6 +26,10 @@ const envConfig = readEnvFile([
   'LOG_VIEWER_ENABLED',
   'LOG_VIEWER_PORT',
   /* ved custom end */
+  /* ved custom */
+  'SENTRY_ACCESS_TOKEN',
+  'SENTRY_ORG_SLUG',
+  /* ved custom end */
 ]);
 
 export const ASSISTANT_NAME =
@@ -129,4 +133,11 @@ export const LOG_VIEWER_PORT =
     process.env.LOG_VIEWER_PORT || envConfig.LOG_VIEWER_PORT || '4242',
     10,
   ) || 4242;
+/* ved custom end */
+
+/* ved custom */
+export const SENTRY_ACCESS_TOKEN =
+  process.env.SENTRY_ACCESS_TOKEN || envConfig.SENTRY_ACCESS_TOKEN || '';
+export const SENTRY_ORG_SLUG =
+  process.env.SENTRY_ORG_SLUG || envConfig.SENTRY_ORG_SLUG || '';
 /* ved custom end */

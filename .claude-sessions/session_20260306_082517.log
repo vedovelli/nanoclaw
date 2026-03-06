@@ -1,0 +1,4 @@
+=== Claude Coding Session ===
+Started: $(date)
+Branch: main
+Goal: Research Sentry MCP installation and auth to implement a new scheduled task that fetches Sentry issues
