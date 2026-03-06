@@ -5,7 +5,6 @@ vi.mock('./config.js', () => ({
   ASSISTANT_NAME: 'TestAssistant',
   DATA_DIR: '/tmp/nanoclaw-test-data',
   MAX_CONCURRENT_CONTAINERS: 3,
-  MAIN_GROUP_FOLDER: 'main',
 }));
 
 vi.mock('fs', async () => {

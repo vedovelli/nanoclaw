@@ -14,7 +14,6 @@ import { ChildProcess } from 'child_process';
 import {
   ASSISTANT_NAME,
   DATA_DIR,
-  MAIN_GROUP_FOLDER,
   MAX_CONCURRENT_CONTAINERS,
 } from './config.js';
 import { ContainerOutput, runContainerAgent } from './container-runner.js';
@@ -85,7 +84,7 @@ export class WarmPool {
         isScheduledTask: true,
         groupFolder: group.folder,
         chatJid,
-        isMain: group.folder === MAIN_GROUP_FOLDER,
+        isMain: group.isMain === true,
         sessionId: sessionId ?? this.sessions[group.folder],
         assistantName: ASSISTANT_NAME,
       },

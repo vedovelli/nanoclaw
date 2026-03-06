@@ -1,4 +1,5 @@
 import { Channel, NewMessage } from './types.js';
+import { formatLocalTime } from './timezone.js';
 /* ved custom */
 import { TIMEZONE } from './config.js';
 import { storeMessage } from './db.js';
@@ -35,14 +36,18 @@ export function escapeXml(s: string): string {
 
 export function formatMessages(
   messages: NewMessage[],
+  timezone: string,
   /* ved custom */
   recentExchanges?: Array<{ userMessage: string; botMessage: string }>,
   /* ved custom end */
 ): string {
-  const lines = messages.map(
-    (m) =>
-      /* ved custom */ `<message sender="${escapeXml(m.sender_name)}" time="${toLocalTime(m.timestamp)}">${escapeXml(m.content)}</message>`, /* ved custom end */
-  );
+  const lines = messages.map((m) => {
+    const displayTime = formatLocalTime(m.timestamp, timezone);
+    return `<message sender="${escapeXml(m.sender_name)}" time="${escapeXml(displayTime)}">${escapeXml(m.content)}</message>`;
+  });
+
+  const header = `<context timezone="${escapeXml(timezone)}" />\n`;
+
   /* ved custom */
   if (recentExchanges && recentExchanges.length > 0) {
     const pairs = recentExchanges
@@ -51,10 +56,11 @@ export function formatMessages(
           `  <exchange>\n    <user>${escapeXml(e.userMessage)}</user>\n    <assistant>${escapeXml(e.botMessage)}</assistant>\n  </exchange>`,
       )
       .join('\n');
-    return `<recent_context>\n${pairs}\n</recent_context>\n<messages>\n${lines.join('\n')}\n</messages>`;
+    return `${header}<recent_context>\n${pairs}\n</recent_context>\n<messages>\n${lines.join('\n')}\n</messages>`;
   }
   /* ved custom end */
-  return `<messages>\n${lines.join('\n')}\n</messages>`;
+
+  return `${header}<messages>\n${lines.join('\n')}\n</messages>`;
 }
 
 export function stripInternalTags(text: string): string {
