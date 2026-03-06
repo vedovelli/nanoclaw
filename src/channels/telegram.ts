@@ -95,6 +95,7 @@ export class TelegramChannel implements Channel {
             `Paused: ${state.paused ? 'Yes' : 'No'}`,
             `Tasks: ${(state.tasks || []).length}`,
             `Next action: ${state.next_action_at || 'N/A'}`,
+            `Dysfunction mode: ${state.dysfunctionMode ? 'ON' : 'off'}`,
           ];
           await ctx.reply(lines.join('\n'));
         } catch {
@@ -115,8 +116,28 @@ export class TelegramChannel implements Channel {
         } catch {
           await ctx.reply('No dev team state found.');
         }
+      } else if (args === 'dysfunction on') {
+        try {
+          const raw = fs.readFileSync(stateFile, 'utf-8');
+          const state = JSON.parse(raw);
+          state.dysfunctionMode = true;
+          fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+          await ctx.reply('Ana dysfunction mode: ON. She will skip tasks and reviews.');
+        } catch {
+          await ctx.reply('No dev team state found.');
+        }
+      } else if (args === 'dysfunction off') {
+        try {
+          const raw = fs.readFileSync(stateFile, 'utf-8');
+          const state = JSON.parse(raw);
+          state.dysfunctionMode = false;
+          fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+          await ctx.reply('Ana dysfunction mode: OFF. She is back to normal.');
+        } catch {
+          await ctx.reply('No dev team state found.');
+        }
       } else {
-        await ctx.reply('Usage: /devteam stop | start | status | run');
+        await ctx.reply('Usage: /devteam stop | start | status | run | dysfunction on | dysfunction off');
       }
     });
     /* ved custom end */
