@@ -592,7 +592,8 @@ Steps:
 11. Post a comment on Linear planning issue ${state.planning_issue} noting PR created for ${pendingTask.issue} (use Linear MCP create_comment)
 
 When done, output: PR_CREATED=<number>
-`, group, chatJid, onProcess, state.dysfunctionMode);
+// dysfunctionMode passed so senior agent uses the normal carlos-prompt (flag is ignored for senior).
+    `, group, chatJid, onProcess, state.dysfunctionMode);
 
     // Parse PR number from agent output and validate it exists on upstream
     const prMatch = devResult.match(/PR_CREATED=(\d+)/);
@@ -704,6 +705,9 @@ async function processReview(
 
   if (state.dysfunctionMode && reviewer === 'junior') {
     // Skip review — Ana is disengaged. Do NOT increment review_round (no real review happened).
+    // NOTE: We set sprint-internal status to 'approved' so the sprint can advance to MERGE.
+    // This does NOT reflect GitHub state — gh pr review --approve is never called, so Ana's
+    // review count on the actual PR remains zero. That's the DevVis signal: PR with no review from Ana.
     needsReview.status = 'approved';
     state.task_under_review = null;
     const allApproved = state.tasks.every(
