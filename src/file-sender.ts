@@ -9,7 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { DATA_DIR, IPC_POLL_INTERVAL, MAIN_GROUP_FOLDER } from './config.js';
+import { DATA_DIR, IPC_POLL_INTERVAL } from './config.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { logger } from './logger.js';
 import { Channel, RegisteredGroup } from './types.js';
@@ -43,7 +43,9 @@ export function startFileSender(deps: FileSenderDeps): void {
     const registeredGroups = deps.registeredGroups();
 
     for (const sourceGroup of groupFolders) {
-      const isMain = sourceGroup === MAIN_GROUP_FOLDER;
+      const isMain = Object.values(registeredGroups).some(
+        (g) => g.folder === sourceGroup && g.isMain === true,
+      );
       const filesDir = path.join(ipcBaseDir, sourceGroup, 'files');
       if (!fs.existsSync(filesDir)) continue;
 
