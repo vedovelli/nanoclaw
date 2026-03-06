@@ -46,14 +46,16 @@ export interface SprintState {
   debate_round: number;
   review_round: number;
   task_under_review: string | null;  // Linear issue identifier
+  dysfunctionMode: boolean;
 }
 
 const STATE_FILE = path.join(process.cwd(), 'data', 'dev-team', 'sprint-state.json');
 const PROMPTS_DIR = path.join(process.cwd(), 'data', 'dev-team');
 
-function readState(): SprintState {
+export function readState(): SprintState {
   const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
   state.task_under_review = state.task_under_review ?? null;
+  state.dysfunctionMode = state.dysfunctionMode ?? false;
   return state;
 }
 

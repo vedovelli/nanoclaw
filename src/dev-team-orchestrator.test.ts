@@ -31,6 +31,7 @@ const BASE_STATE = {
   debate_round: 0,
   review_round: 0,
   task_under_review: null,
+  dysfunctionMode: false,
 };
 
 describe('DevTeam Orchestrator', () => {
@@ -56,6 +57,22 @@ describe('DevTeam Orchestrator', () => {
 
     expect(result).toBe('Dev team is paused.');
     expect(runContainerAgent).not.toHaveBeenCalled();
+    readSpy.mockRestore();
+  });
+
+  it('readState() defaults dysfunctionMode to false when field is absent', async () => {
+    const stateWithoutDysf = { ...BASE_STATE };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (stateWithoutDysf as any).dysfunctionMode;
+
+    const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValueOnce(
+      JSON.stringify(stateWithoutDysf) as any,
+    );
+
+    const { readState } = await import('./dev-team-orchestrator.js');
+    const state = readState();
+
+    expect(state.dysfunctionMode).toBe(false);
     readSpy.mockRestore();
   });
 });
