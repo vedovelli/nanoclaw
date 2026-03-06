@@ -454,6 +454,8 @@ You can:
 - Counter-propose simpler/different approaches
 - Suggest modifications
 
+If Ana hasn't commented yet, acknowledge it briefly in your comment (e.g. "Ana hasn't weighed in yet — moving forward based on what we have.") and proceed.
+
 If you feel there's enough agreement on 2-4 tasks, end your comment with: CONSENSUS_REACHED
 `;
 
@@ -473,12 +475,21 @@ Note: the final call on when the team has reached consensus belongs to the senio
 Do NOT end your comment with CONSENSUS_REACHED.
 `;
 
-  await runAgent(agent, agent === 'senior' ? seniorPrompt : juniorPrompt, group, chatJid, onProcess);
+  // Skip Ana's debate turn with 60% probability when dysfunction mode is active
+  if (state.dysfunctionMode && agent === 'junior' && Math.random() < 0.6) {
+    state.next_action_at = randomDelay(3, 8);
+    writeState(state);
+    return `Ana skipped debate round ${state.debate_round} (dysfunction mode)`;
+  }
+
+  await runAgent(agent, agent === 'senior' ? seniorPrompt : juniorPrompt, group, chatJid, onProcess, state.dysfunctionMode);
 
   // Check if orchestrator detects consensus
   const orchestratorResult = await runAgent('orchestrator', `
 Read the comments on Linear issue ${state.planning_issue}:
   Use the Linear MCP list_comments tool on issue ${state.planning_issue}.
+
+Ana may not have commented — if only Carlos has responded, that is sufficient to detect consensus if his proposals are clear.
 
 Analyze whether the team has reached consensus on sprint tasks.
 If yes, respond with: CONSENSUS=true
