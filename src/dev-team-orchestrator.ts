@@ -27,7 +27,7 @@ export interface SprintTask {
   issue: string | null;  // Linear issue identifier, e.g. "FAB-1"
   assignee: 'senior' | 'junior';
   pr: number | null;
-  status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged';
+  status: 'pending' | 'dev' | 'pr_created' | 'in_review' | 'changes_requested' | 'approved' | 'merged' | 'skipped_dysfunction';
   branch: string | null;
   merge_attempts?: number;  // count of failed merge attempts; pauses sprint after 3
 }
@@ -563,6 +563,13 @@ async function checkDevProgress(
   );
 
   if (pendingTask) {
+    if (state.dysfunctionMode && pendingTask.assignee === 'junior') {
+      pendingTask.status = 'skipped_dysfunction';
+      state.next_action_at = randomDelay(5, 15);
+      writeState(state);
+      return `Ana skipped task ${pendingTask.issue} (dysfunction mode)`;
+    }
+
     const agent = pendingTask.assignee;
     const config = agentConfig(agent);
     const reviewerUser = agent === 'senior' ? DEVTEAM_JUNIOR_GITHUB_USER : DEVTEAM_SENIOR_GITHUB_USER;
@@ -579,13 +586,13 @@ Steps:
 5. Create a feature branch: ${pendingTask.branch || `feature/issue-${pendingTask.issue}`}
 6. Implement ONLY what Linear issue ${pendingTask.issue} describes, with multiple atomic commits
 7. Push to your fork
-8. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:${pendingTask.branch || `feature/issue-${pendingTask.issue}`} --title "..." --body "Implements Linear ${pendingTask.issue}\n\n..."
+8. Create a PR to upstream: gh pr create --repo ${DEVTEAM_UPSTREAM_REPO} --head ${config.user}:${pendingTask.branch || `feature/issue-${pendingTask.issue}`} --title "..." --body "Implements Linear ${pendingTask.issue}\\n\\n..."
 9. Request a review from your teammate: gh pr edit <pr-number> --repo ${DEVTEAM_UPSTREAM_REPO} --add-reviewer ${reviewerUser}
 10. Post a comment on Linear issue ${pendingTask.issue} saying the PR is open (use Linear MCP create_comment)
 11. Post a comment on Linear planning issue ${state.planning_issue} noting PR created for ${pendingTask.issue} (use Linear MCP create_comment)
 
 When done, output: PR_CREATED=<number>
-`, group, chatJid, onProcess);
+`, group, chatJid, onProcess, state.dysfunctionMode);
 
     // Parse PR number from agent output and validate it exists on upstream
     const prMatch = devResult.match(/PR_CREATED=(\d+)/);

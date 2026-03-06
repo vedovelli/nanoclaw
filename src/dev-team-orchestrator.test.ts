@@ -12,9 +12,11 @@ vi.mock('./config.js', () => ({
   DEVTEAM_SENIOR_GITHUB_USER: 'carlos-test',
   DEVTEAM_JUNIOR_GITHUB_TOKEN: 'token-jr',
   DEVTEAM_JUNIOR_GITHUB_USER: 'ana-test',
+  DEVTEAM_PM_GITHUB_TOKEN: 'token-pm',
+  DEVTEAM_FAST_MODE: false,
 }));
 vi.mock('./logger.js', () => ({
-  logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn(), warn: vi.fn() },
 }));
 
 const BASE_STATE = {
@@ -100,5 +102,49 @@ describe('DevTeam Orchestrator', () => {
     expect(calls.some((p) => p.endsWith('ana-prompt.md'))).toBe(false);
 
     readFileSpy.mockRestore();
+  });
+
+  it('checkDevProgress skips junior task and does not call runContainerAgent when dysfunctionMode is true', async () => {
+    const { runContainerAgent } = await import('./container-runner.js');
+    vi.mocked(runContainerAgent).mockClear();
+
+    const stateWithDysfunction = {
+      ...BASE_STATE,
+      state: 'DEV' as const,
+      dysfunctionMode: true,
+      senior_fork: 'carlos-test/repo',
+      junior_fork: 'ana-test/repo',
+      tasks: [
+        {
+          issue: 'FAB-1',
+          assignee: 'junior' as const,
+          status: 'pending' as const,
+          branch: 'feature/fab-1',
+          pr: null,
+          merge_attempts: 0,
+        },
+      ],
+    };
+
+    const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify(stateWithDysfunction) as any
+    );
+    const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+
+    const mockGroup = { folder: 'background', name: 'background' } as any;
+    const { runDevTeamOrchestrator } = await import('./dev-team-orchestrator.js');
+    const result = await runDevTeamOrchestrator(mockGroup, 'test-jid', vi.fn());
+
+    expect(runContainerAgent).not.toHaveBeenCalled();
+    expect(result).toContain('skipped');
+
+    // Verify state was written with skipped_dysfunction status
+    const writeCall = writeSpy.mock.calls.find(c => String(c[0]).endsWith('sprint-state.json'));
+    expect(writeCall).toBeDefined();
+    const writtenState = JSON.parse(writeCall![1] as string);
+    expect(writtenState.tasks[0].status).toBe('skipped_dysfunction');
+
+    readSpy.mockRestore();
+    writeSpy.mockRestore();
   });
 });
