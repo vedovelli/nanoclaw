@@ -226,3 +226,12 @@ You have access to Gmail via MCP tools:
 - `mcp__gmail__list_labels` - List available labels
 
 Example: "Check my unread emails from today" or "Send an email to john@example.com about the meeting"
+
+## Development Workflow
+
+### Pull Request Review Process
+
+When a PR is pushed to a repository:
+1. Team members push their changes to a PR branch
+2. They mention `@claude` in the PR to request a review
+3. I should review the PR and provide feedback on the code changes

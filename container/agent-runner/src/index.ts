@@ -544,14 +544,9 @@ async function runQuery(
           headers: { Authorization: `Bearer ${sdkEnv.FLARE_API_TOKEN || ''}` },
         },
         'basic-memory-cloud': {
-          command: 'npx',
-          args: [
-            '-y',
-            'mcp-remote',
-            'https://cloud.basicmemory.com/mcp',
-            '--header',
-            `Authorization: Bearer ${sdkEnv.BASIC_MEMORY_API_KEY || ''}`,
-          ],
+          type: 'http' as const,
+          url: 'https://cloud.basicmemory.com/mcp',
+          headers: { Authorization: `Bearer ${sdkEnv.BASIC_MEMORY_API_KEY || ''}` },
         },
         aidevteam: {
           type: 'http' as const,
