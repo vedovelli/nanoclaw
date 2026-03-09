@@ -482,6 +482,7 @@ async function runAgent(
         chatJid,
         isMain,
         assistantName: ASSISTANT_NAME,
+        /* ved custom */ model: 'claude-opus-4-6', /* ved custom end */
       },
       (proc, containerName) =>
         queue.registerProcess(chatJid, proc, containerName, group.folder),
