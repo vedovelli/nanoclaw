@@ -233,12 +233,12 @@ describe('WarmPool', () => {
     expect(userHandler).toHaveBeenCalledWith(fakeOutput);
   });
 
-  it('updateSession stores sessionId used for next prewarm', async () => {
+  it('prewarm always starts with no session to avoid context contamination', async () => {
     const { runContainerAgent } = await import('./container-runner.js');
     pool.updateSession('my-group', 'sess-abc');
     await pool.prewarm('group1@g.us', makeGroup('my-group') as any);
     const [, input] = vi.mocked(runContainerAgent).mock.calls[0];
-    expect(input.sessionId).toBe('sess-abc');
+    expect(input.sessionId).toBeUndefined();
   });
 
   it('respawns after container exits with 2s delay', async () => {

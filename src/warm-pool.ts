@@ -85,7 +85,7 @@ export class WarmPool {
         groupFolder: group.folder,
         chatJid,
         isMain: group.isMain === true,
-        sessionId: sessionId ?? this.sessions[group.folder],
+        /* ved custom */ sessionId: undefined, /* ved custom end */ // Don't resume session — avoids context contamination across topic changes
         assistantName: ASSISTANT_NAME,
       },
       (proc, containerName) => {
