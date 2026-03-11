@@ -130,7 +130,7 @@ function createSchema(database: Database.Database): void {
   } catch {
     /* column already exists */
   }
-  // Backfill from JID patterns (safe to re-run — idempotent UPDATEs)
+  // Backfill from JID patterns (safe to re-run — only updates NULL rows)
   database.exec(
     `UPDATE chats SET channel = 'whatsapp', is_group = 1 WHERE jid LIKE '%@g.us' AND channel IS NULL`,
   );

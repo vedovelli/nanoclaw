@@ -34,7 +34,6 @@ interface ContainerInput {
   isScheduledTask?: boolean;
   /* ved custom */ notifyJid?: string; /* ved custom end */
   assistantName?: string;
-  secrets?: Record<string, string>;
   /* ved custom */ model?: string; /* ved custom end */
 }
 
@@ -210,9 +209,10 @@ function createPreCompactHook(assistantName?: string): HookCallback {
   };
 }
 
+/* ved custom */
 // Secrets to strip from Bash tool subprocess environments.
 // These are needed by claude-code for API auth but should never
-// be visible to commands Kit runs.
+// be visible to commands the agent runs.
 const SECRET_ENV_VARS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
 
 function createSanitizeBashHook(): HookCallback {
@@ -233,6 +233,7 @@ function createSanitizeBashHook(): HookCallback {
     };
   };
 }
+/* ved custom end */
 
 function sanitizeFilename(summary: string): string {
   return summary
@@ -564,10 +565,10 @@ async function runQuery(
         /* ved custom end */
       },
       hooks: {
-        PreCompact: [
-          { hooks: [createPreCompactHook(containerInput.assistantName)] },
-        ],
+        PreCompact: [{ hooks: [createPreCompactHook(containerInput.assistantName)] }],
+        /* ved custom */
         PreToolUse: [{ matcher: 'Bash', hooks: [createSanitizeBashHook()] }],
+        /* ved custom end */
       },
     },
   })) {
@@ -629,12 +630,7 @@ async function main(): Promise<void> {
   try {
     const stdinData = await readStdin();
     containerInput = JSON.parse(stdinData);
-    // Delete the temp file the entrypoint wrote — it contains secrets
-    try {
-      fs.unlinkSync('/tmp/input.json');
-    } catch {
-      /* may not exist */
-    }
+    try { fs.unlinkSync('/tmp/input.json'); } catch { /* may not exist */ }
     log(`Received input for group: ${containerInput.groupFolder}`);
   } catch (err) {
     writeOutput({
@@ -645,12 +641,9 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Build SDK env: merge secrets into process.env for the SDK only.
-  // Secrets never touch process.env itself, so Bash subprocesses can't see them.
+  // Credentials are injected by the host's credential proxy via ANTHROPIC_BASE_URL.
+  // No real secrets exist in the container environment.
   const sdkEnv: Record<string, string | undefined> = { ...process.env };
-  for (const [key, value] of Object.entries(containerInput.secrets || {})) {
-    sdkEnv[key] = value;
-  }
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const mcpServerPath = path.join(__dirname, 'ipc-mcp-stdio.js');
