@@ -24,6 +24,31 @@ export interface TelegramChannelOpts {
   registeredGroups: () => Record<string, RegisteredGroup>;
 }
 
+/* ved custom */
+/**
+ * Convert common Markdown patterns to Telegram HTML.
+ * HTML parse_mode is more tolerant than Markdown — no unmatched-entity errors.
+ */
+export function formatForTelegram(text: string): string {
+  // Escape HTML special characters first
+  let result = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Bold: *text* → <b>text</b>  (non-greedy, single line)
+  result = result.replace(/\*([^*\n]+)\*/g, '<b>$1</b>');
+
+  // Italic: _text_ → <i>text</i>  (non-greedy, single line)
+  result = result.replace(/_([^_\n]+)_/g, '<i>$1</i>');
+
+  // Inline code: `text` → <code>text</code>  (single-line only)
+  result = result.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+  return result;
+}
+/* ved custom end */
+
 export class TelegramChannel implements Channel {
   name = 'telegram';
 
@@ -371,12 +396,12 @@ export class TelegramChannel implements Channel {
       /* ved custom */
       const sendChunk = async (chunk: string) => {
         try {
-          await this.bot!.api.sendMessage(numericId, chunk, {
-            parse_mode: 'Markdown',
+          await this.bot!.api.sendMessage(numericId, formatForTelegram(chunk), {
+            parse_mode: 'HTML',
           });
         } catch (err) {
-          // Fall back to plain text if Markdown parsing fails (e.g. unmatched symbols)
-          logger.warn({ err }, 'Markdown send failed, falling back to plain text');
+          // Fall back to plain text if HTML parsing fails
+          logger.warn({ err }, 'HTML send failed, falling back to plain text');
           await this.bot!.api.sendMessage(numericId, chunk);
         }
       };

@@ -71,7 +71,9 @@ vi.mock('grammy', () => ({
   },
 }));
 
-import { TelegramChannel, TelegramChannelOpts } from './telegram.js';
+/* ved custom */
+import { TelegramChannel, TelegramChannelOpts, formatForTelegram } from './telegram.js';
+/* ved custom end */
 
 // --- Test helpers ---
 
@@ -179,6 +181,46 @@ async function triggerMediaMessage(
 }
 
 // --- Tests ---
+
+/* ved custom */
+describe('formatForTelegram', () => {
+  it('renders *bold* as <b>', () => {
+    expect(formatForTelegram('*hello*')).toBe('<b>hello</b>');
+  });
+
+  it('renders _italic_ as <i>', () => {
+    expect(formatForTelegram('_hello_')).toBe('<i>hello</i>');
+  });
+
+  it('renders `code` as <code>', () => {
+    expect(formatForTelegram('`hello`')).toBe('<code>hello</code>');
+  });
+
+  it('escapes HTML special chars before converting markdown', () => {
+    expect(formatForTelegram('a < b & *bold*')).toBe(
+      'a &lt; b &amp; <b>bold</b>',
+    );
+  });
+
+  it('leaves unmatched * unchanged', () => {
+    expect(formatForTelegram('hello *world')).toBe('hello *world');
+  });
+
+  it('handles mixed bold and italic in one message', () => {
+    expect(formatForTelegram('*bold* and _italic_')).toBe(
+      '<b>bold</b> and <i>italic</i>',
+    );
+  });
+
+  it('does not match across lines', () => {
+    expect(formatForTelegram('*line1\nline2*')).toBe('*line1\nline2*');
+  });
+
+  it('passes through plain text unchanged', () => {
+    expect(formatForTelegram('plain message')).toBe('plain message');
+  });
+});
+/* ved custom end */
 
 describe('TelegramChannel', () => {
   beforeEach(() => {
@@ -801,7 +843,7 @@ describe('TelegramChannel', () => {
       expect(currentBot().api.sendMessage).toHaveBeenCalledWith(
         '100200300',
         'Hello',
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'HTML' },
       );
       /* ved custom end */
     });
@@ -817,7 +859,7 @@ describe('TelegramChannel', () => {
       expect(currentBot().api.sendMessage).toHaveBeenCalledWith(
         '-1001234567890',
         'Group message',
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'HTML' },
       );
       /* ved custom end */
     });
@@ -836,13 +878,13 @@ describe('TelegramChannel', () => {
         1,
         '100200300',
         'x'.repeat(4096),
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'HTML' },
       );
       expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
         2,
         '100200300',
         'x'.repeat(904),
-        { parse_mode: 'Markdown' },
+        { parse_mode: 'HTML' },
       );
       /* ved custom end */
     });
@@ -859,12 +901,12 @@ describe('TelegramChannel', () => {
     });
 
     /* ved custom */
-    it('falls back to plain text when Markdown send fails', async () => {
+    it('falls back to plain text when HTML send fails', async () => {
       const opts = createTestOpts();
       const channel = new TelegramChannel('test-token', opts);
       await channel.connect();
 
-      // First call (Markdown) fails; second call (plain text fallback) succeeds
+      // First call (HTML) fails; second call (plain text fallback) succeeds
       currentBot().api.sendMessage.mockRejectedValueOnce(
         new Error('Bad Request: can\'t parse entities'),
       );
@@ -872,14 +914,14 @@ describe('TelegramChannel', () => {
       await channel.sendMessage('tg:100200300', 'Hello *world');
 
       expect(currentBot().api.sendMessage).toHaveBeenCalledTimes(2);
-      // First: Markdown attempt
+      // First: HTML attempt (with formatForTelegram applied)
       expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
         1,
         '100200300',
-        'Hello *world',
-        { parse_mode: 'Markdown' },
+        'Hello *world', // no matching closing *, formatForTelegram leaves it unchanged
+        { parse_mode: 'HTML' },
       );
-      // Second: plain text fallback (no parse_mode)
+      // Second: plain text fallback (original text, no parse_mode)
       expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
         2,
         '100200300',
@@ -894,7 +936,7 @@ describe('TelegramChannel', () => {
       await channel.connect();
 
       /* ved custom */
-      // Both Markdown attempt and plain-text fallback fail → outer catch logs error, no throw
+      // Both HTML attempt and plain-text fallback fail → outer catch logs error, no throw
       currentBot().api.sendMessage.mockRejectedValue(
         new Error('Network error'),
       );
