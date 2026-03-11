@@ -797,10 +797,13 @@ describe('TelegramChannel', () => {
 
       await channel.sendMessage('tg:100200300', 'Hello');
 
+      /* ved custom */
       expect(currentBot().api.sendMessage).toHaveBeenCalledWith(
         '100200300',
         'Hello',
+        { parse_mode: 'Markdown' },
       );
+      /* ved custom end */
     });
 
     it('strips tg: prefix from JID', async () => {
@@ -810,10 +813,13 @@ describe('TelegramChannel', () => {
 
       await channel.sendMessage('tg:-1001234567890', 'Group message');
 
+      /* ved custom */
       expect(currentBot().api.sendMessage).toHaveBeenCalledWith(
         '-1001234567890',
         'Group message',
+        { parse_mode: 'Markdown' },
       );
+      /* ved custom end */
     });
 
     it('splits messages exceeding 4096 characters', async () => {
@@ -825,16 +831,20 @@ describe('TelegramChannel', () => {
       await channel.sendMessage('tg:100200300', longText);
 
       expect(currentBot().api.sendMessage).toHaveBeenCalledTimes(2);
+      /* ved custom */
       expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
         1,
         '100200300',
         'x'.repeat(4096),
+        { parse_mode: 'Markdown' },
       );
       expect(currentBot().api.sendMessage).toHaveBeenNthCalledWith(
         2,
         '100200300',
         'x'.repeat(904),
+        { parse_mode: 'Markdown' },
       );
+      /* ved custom end */
     });
 
     it('sends exactly one message at 4096 characters', async () => {
