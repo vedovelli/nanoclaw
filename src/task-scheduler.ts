@@ -2,12 +2,7 @@ import { ChildProcess } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import fs from 'fs';
 
-import {
-  ASSISTANT_NAME,
-  /* ved custom */ GROUPS_DIR, /* ved custom end */
-  SCHEDULER_POLL_INTERVAL,
-  TIMEZONE,
-} from './config.js';
+import { ASSISTANT_NAME, /* ved custom */ GROUPS_DIR, /* ved custom end */ SCHEDULER_POLL_INTERVAL, TIMEZONE } from './config.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -316,6 +311,7 @@ async function runTask(
         }
         if (streamedOutput.status === 'success') {
           deps.queue.notifyIdle(task.chat_jid);
+          scheduleClose(); // Close promptly even when result is null (e.g. IPC-only tasks)
         }
         if (streamedOutput.status === 'error') {
           error = streamedOutput.error || 'Unknown error';

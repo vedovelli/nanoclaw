@@ -10,19 +10,23 @@ import {
   CONTAINER_IMAGE,
   CONTAINER_MAX_OUTPUT_SIZE,
   CONTAINER_TIMEOUT,
+  CREDENTIAL_PROXY_PORT,
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
   TIMEZONE,
 } from './config.js';
-import { readEnvFile } from './env.js';
 import { resolveGroupFolderPath, resolveGroupIpcPath } from './group-folder.js';
 import { logger } from './logger.js';
 import {
+  CONTAINER_HOST_GATEWAY,
   CONTAINER_RUNTIME_BIN,
+  hostGatewayArgs,
   readonlyMountArgs,
   stopContainer,
 } from './container-runtime.js';
+import { detectAuthMode } from './credential-proxy.js';
+import { readEnvFile } from './env.js';
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
 
@@ -74,8 +78,10 @@ export interface ContainerInput {
   isScheduledTask?: boolean;
   /* ved custom */ notifyJid?: string; /* ved custom end */
   assistantName?: string;
+  /* ved custom */
+  model?: string;
   secrets?: Record<string, string>;
-  /* ved custom */ model?: string; /* ved custom end */
+  /* ved custom end */
 }
 
 export interface ContainerOutput {
@@ -115,7 +121,7 @@ function buildVolumeMounts(
     });
 
     // Shadow .env so the agent cannot read secrets from the mounted project root.
-    // Secrets are passed via stdin instead (see readSecrets()).
+    // Credentials are injected by the credential proxy, never exposed to containers.
     const envFile = path.join(projectRoot, '.env');
     if (fs.existsSync(envFile)) {
       mounts.push({
@@ -293,23 +299,6 @@ function buildVolumeMounts(
   return mounts;
 }
 
-/**
- * Read allowed secrets from .env for passing to the container via stdin.
- * Secrets are never written to disk or mounted as files.
- */
-function readSecrets(): Record<string, string> {
-  /* ved custom */ return readEnvFile([
-    'CLAUDE_CODE_OAUTH_TOKEN',
-    'ANTHROPIC_API_KEY',
-    'ANTHROPIC_BASE_URL',
-    'ANTHROPIC_AUTH_TOKEN',
-    'GITHUB_PERSONAL_ACCESS_TOKEN',
-    'FLARE_API_TOKEN',
-    'BASIC_MEMORY_API_KEY',
-    'LINEAR_API_KEY',
-  ]); /* ved custom end */
-}
-
 function buildContainerArgs(
   mounts: VolumeMount[],
   containerName: string,
@@ -318,6 +307,39 @@ function buildContainerArgs(
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
+
+  // Route API traffic through the credential proxy (containers never see real secrets)
+  args.push(
+    '-e',
+    `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`,
+  );
+
+  // Mirror the host's auth method with a placeholder value.
+  // API key mode: SDK sends x-api-key, proxy replaces with real key.
+  // OAuth mode:   SDK exchanges placeholder token for temp API key,
+  //               proxy injects real OAuth token on that exchange request.
+  const authMode = detectAuthMode();
+  if (authMode === 'api-key') {
+    args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
+  } else {
+    args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
+  }
+
+  // Runtime-specific args for host gateway resolution
+  args.push(...hostGatewayArgs());
+
+  /* ved custom */
+  // Pass non-Anthropic MCP secrets as env vars (Anthropic auth goes through the proxy)
+  const mcpSecrets = readEnvFile([
+    'GITHUB_PERSONAL_ACCESS_TOKEN',
+    'FLARE_API_TOKEN',
+    'BASIC_MEMORY_API_KEY',
+    'LINEAR_API_KEY',
+  ]);
+  for (const [key, value] of Object.entries(mcpSecrets)) {
+    if (value) args.push('-e', `${key}=${value}`);
+  }
+  /* ved custom end */
 
   // Run as host user so bind-mounted files are accessible.
   // Skip when running as root (uid 0), as the container's node user (uid 1000),
@@ -358,6 +380,16 @@ export async function runContainerAgent(
   const containerName = `nanoclaw-${safeName}-${Date.now()}`;
   const containerArgs = buildContainerArgs(mounts, containerName);
 
+  /* ved custom */
+  // Inject per-container secrets as env vars (e.g. per-agent GitHub tokens for dev team)
+  if (input.secrets) {
+    const imageIdx = containerArgs.lastIndexOf(CONTAINER_IMAGE);
+    for (const [key, value] of Object.entries(input.secrets)) {
+      if (value) containerArgs.splice(imageIdx, 0, '-e', `${key}=${value}`);
+    }
+  }
+  /* ved custom end */
+
   logger.debug(
     {
       group: group.name,
@@ -396,20 +428,14 @@ export async function runContainerAgent(
     let stdoutTruncated = false;
     let stderrTruncated = false;
 
-    // Pass secrets via stdin (never written to disk or mounted as files)
-    // Merge: caller-supplied secrets override readSecrets() values (e.g. per-agent GH_TOKEN)
     /* ved custom */
-    const callerSecrets = input.secrets || {};
-    input.secrets = { ...readSecrets(), ...callerSecrets };
-    /* ved custom end */
     // Propagate notifyJid from group config so background tasks can route messages
     if (!input.notifyJid && group.containerConfig?.notifyJid) {
       input.notifyJid = group.containerConfig.notifyJid;
     }
+    /* ved custom end */
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
-    // Remove secrets from input so they don't appear in logs
-    delete input.secrets;
 
     // Streaming output: parse OUTPUT_START/END marker pairs as they arrive
     let parseBuffer = '';

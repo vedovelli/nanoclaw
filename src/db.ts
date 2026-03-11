@@ -122,27 +122,23 @@ function createSchema(database: Database.Database): void {
   // Add channel and is_group columns if they don't exist (migration for existing DBs)
   try {
     database.exec(`ALTER TABLE chats ADD COLUMN channel TEXT`);
-  } catch {
-    /* column already exists */
-  }
-  try {
     database.exec(`ALTER TABLE chats ADD COLUMN is_group INTEGER DEFAULT 0`);
+    // Backfill from JID patterns
+    database.exec(
+      `UPDATE chats SET channel = 'whatsapp', is_group = 1 WHERE jid LIKE '%@g.us'`,
+    );
+    database.exec(
+      `UPDATE chats SET channel = 'whatsapp', is_group = 0 WHERE jid LIKE '%@s.whatsapp.net'`,
+    );
+    database.exec(
+      `UPDATE chats SET channel = 'discord', is_group = 1 WHERE jid LIKE 'dc:%'`,
+    );
+    database.exec(
+      `UPDATE chats SET channel = 'telegram', is_group = 1 WHERE jid LIKE 'tg:%'`,
+    );
   } catch {
     /* column already exists */
   }
-  // Backfill from JID patterns (safe to re-run — idempotent UPDATEs)
-  database.exec(
-    `UPDATE chats SET channel = 'whatsapp', is_group = 1 WHERE jid LIKE '%@g.us' AND channel IS NULL`,
-  );
-  database.exec(
-    `UPDATE chats SET channel = 'whatsapp', is_group = 0 WHERE jid LIKE '%@s.whatsapp.net' AND channel IS NULL`,
-  );
-  database.exec(
-    `UPDATE chats SET channel = 'discord', is_group = 1 WHERE jid LIKE 'dc:%' AND channel IS NULL`,
-  );
-  database.exec(
-    `UPDATE chats SET channel = 'telegram', is_group = 1 WHERE jid LIKE 'tg:%' AND channel IS NULL`,
-  );
 }
 
 export function initDatabase(): void {
