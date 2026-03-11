@@ -368,16 +368,26 @@ export class TelegramChannel implements Channel {
 
       // Telegram has a 4096 character limit per message — split if needed
       const MAX_LENGTH = 4096;
+      /* ved custom */
+      const sendChunk = async (chunk: string) => {
+        try {
+          await this.bot!.api.sendMessage(numericId, chunk, {
+            parse_mode: 'Markdown',
+          });
+        } catch (err) {
+          // Fall back to plain text if Markdown parsing fails (e.g. unmatched symbols)
+          logger.warn({ err }, 'Markdown send failed, falling back to plain text');
+          await this.bot!.api.sendMessage(numericId, chunk);
+        }
+      };
       if (text.length <= MAX_LENGTH) {
-        await this.bot.api.sendMessage(numericId, text);
+        await sendChunk(text);
       } else {
         for (let i = 0; i < text.length; i += MAX_LENGTH) {
-          await this.bot.api.sendMessage(
-            numericId,
-            text.slice(i, i + MAX_LENGTH),
-          );
+          await sendChunk(text.slice(i, i + MAX_LENGTH));
         }
       }
+      /* ved custom end */
       logger.info({ jid, length: text.length }, 'Telegram message sent');
     } catch (err) {
       logger.error({ jid, err }, 'Failed to send Telegram message');
