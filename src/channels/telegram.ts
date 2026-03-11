@@ -374,8 +374,9 @@ export class TelegramChannel implements Channel {
           await this.bot!.api.sendMessage(numericId, chunk, {
             parse_mode: 'Markdown',
           });
-        } catch {
+        } catch (err) {
           // Fall back to plain text if Markdown parsing fails (e.g. unmatched symbols)
+          logger.warn({ err }, 'Markdown send failed, falling back to plain text');
           await this.bot!.api.sendMessage(numericId, chunk);
         }
       };
