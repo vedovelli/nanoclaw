@@ -1,13 +1,13 @@
 ---
 name: competitor-monitor
-description: Daily competitive intelligence monitor for Faros AI and Jellyfish. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Basic Memory; sends an HTML report by email when changes are found; maintains a persistent timeline; creates GitHub issues for features relevant to Dev Visibility.
+description: Daily competitive intelligence monitor for Faros AI, Jellyfish, and Entelligence AI. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Basic Memory; sends an HTML report by email when changes are found; maintains a persistent timeline; creates GitHub issues for features relevant to Dev Visibility.
 ---
 
 # Competitor Monitor — Dev Visibility
 
 ## Notification Rules — Read Before Doing Anything
 
-**You may only call `mcp__gmail__*` to send an email when there are actual changes since yesterday for at least one competitor.**
+**You may only call `mcp__gmail__*` to send an email when there are actual changes since yesterday for at least one competitor (Faros AI, Jellyfish, or Entelligence AI).**
 
 In every other situation (no changes, errors, API failures), produce no output and call no tools except `<internal>`.
 
@@ -23,10 +23,12 @@ This skill does the following on every run:
 
 1. Calculates today's and yesterday's dates
 2. Reads yesterday's snapshots from Basic Memory
-3. Researches Faros AI (GitHub API + browser) and Jellyfish (browser)
-4. Compares findings with yesterday's snapshot
-5. If no changes in either competitor → silent exit
-6. If changes found → generates HTML report → sends as HTML email body → updates timeline in Basic Memory → saves daily snapshots → creates GitHub issues for Dev Visibility-relevant features
+3. Researches Faros AI (GitHub API + browser)
+4. Researches Jellyfish (browser)
+5. Researches Entelligence AI (GitHub API + browser)
+6. Compares findings with yesterday's snapshot
+7. If no changes in any competitor → silent exit
+8. If changes found → generates HTML report → sends as HTML email body → updates timeline in Basic Memory → saves daily snapshots → creates GitHub issues for Dev Visibility-relevant features
 
 ## Steps
 
@@ -43,14 +45,16 @@ echo "Today: $TODAY | Yesterday: $YESTERDAY"
 Use `mcp__basic-memory-cloud__read_note` with `project: "dev-visibility-product"` for:
 - `Concorrência/Faros AI/$YESTERDAY`
 - `Concorrência/Jellyfish/$YESTERDAY`
+- `Concorrência/Entelligence AI/$YESTERDAY`
 
-If either note is not found (e.g. first run), fall back to the base analysis docs:
+If any note is not found (e.g. first run), fall back to the base analysis docs:
 - `Concorrência/Faros AI - Análise Competitiva`
 - `Concorrência/Jellyfish - Análise Competitiva`
+- `Concorrência/Entelligence AI - Análise Competitiva`
 
 Also read `Concorrência/Monitoramento Diário - Perguntas de Análise` to understand which signals to look for.
 
-Store the content of both snapshots in memory for comparison in step 5.
+Store the content of all snapshots in memory for comparison in step 6.
 
 Also check whether `Concorrência/Run/$TODAY` already exists in Basic Memory (`project: "dev-visibility-product"`).
 If it does, today's run already completed. Exit silently:
@@ -65,9 +69,9 @@ If it does NOT exist, write it now before proceeding:
 
 This sentinel is written before any research begins, so re-runs triggered by container crashes or scheduler retries will not produce duplicate emails.
 
-Additionally, always read `Concorrência/Faros AI - Análise Competitiva` and `Concorrência/Jellyfish - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for both competitors. Store these for use in step 7 when applying the `high-threat` CSS class.
+Additionally, always read `Concorrência/Faros AI - Análise Competitiva`, `Concorrência/Jellyfish - Análise Competitiva`, and `Concorrência/Entelligence AI - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for all competitors. Store these for use in step 8 when applying the `high-threat` CSS class.
 
-Also read these two product documents from Basic Memory (`project: "dev-visibility-product"`) to understand what Dev Visibility is building. You will use this context in steps 3–4 to identify competitor features worth turning into GitHub issues:
+Also read these two product documents from Basic Memory (`project: "dev-visibility-product"`) to understand what Dev Visibility is building. You will use this context in steps 3–5 to identify competitor features worth turning into GitHub issues:
 
 - `design/PRD - PoC Single-User v1.0` (primary — what we're building now)
 - `design/PRD - MVP Enterprise-Ready` (secondary — future direction)
@@ -143,7 +147,59 @@ Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDI
 
 If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Jellyfish as having no changes for today.
 
-### 5. Compare with yesterday
+### 5. Research Entelligence AI
+
+Entelligence AI is an AI-powered engineering intelligence platform competing directly with Dev Visibility on code review automation, team performance insights, AI documentation, and MCP integration.
+
+**a) GitHub repos (original, non-fork only):**
+
+```bash
+gh api orgs/Entelligence-AI/repos --jq '[.[] | select(.fork == false) | {name: .full_name, pushed: .pushed_at, description: .description}]'
+```
+
+Check for any repos pushed since $YESTERDAY. For repos with recent activity, check releases:
+
+```bash
+gh api repos/Entelligence-AI/chat-popup/releases \
+  -f per_page=5 \
+  --jq '[.[] | select(.published_at >= "'$YESTERDAY'") | {tag: .tag_name, published: .published_at, body: .body}]'
+```
+
+```bash
+gh api repos/Entelligence-AI/code_review_evals/releases \
+  -f per_page=5 \
+  --jq '[.[] | select(.published_at >= "'$YESTERDAY'") | {tag: .tag_name, published: .published_at, body: .body}]'
+```
+
+Also check if any new non-fork repos appeared since yesterday's snapshot.
+
+**b) Documentation changes:**
+
+Use `agent-browser` to fetch `https://docs.entelligence.ai/`. Compare the page structure, feature descriptions, and integration list against yesterday's snapshot. Pay particular attention to:
+- New integration pages (IDE, MCP, or third-party tools)
+- Changes to Team Insights / Performance Review features
+- New product capabilities
+
+**c) Blog / announcements:**
+
+Use `agent-browser` to fetch `https://www.entelligence.ai/blog` (or homepage if no dedicated blog path). Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
+
+**d) Product page:**
+
+Use `agent-browser` to fetch `https://www.entelligence.ai/`. Note any changes in positioning, feature highlights, new customer logos, or announcements compared to yesterday's snapshot.
+
+**e) Tag Dev Visibility candidates:**
+
+Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDIDATE]` if it aligns with PRD capabilities or reduces Dev Visibility's differentiation. Entelligence AI overlaps heavily with Dev Visibility in these areas:
+- Code review automation (PR reviews)
+- Team performance metrics and sprint assessment
+- AI-powered documentation generation
+- MCP integration
+- IDE integration
+
+If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL sources in this step fail, treat Entelligence AI as having no changes for today.
+
+### 6. Compare with yesterday
 
 For each competitor, answer these questions using the monitoring questions from Basic Memory and what you found:
 
@@ -156,18 +212,19 @@ Produce a structured findings list for each competitor:
 ```
 FAROS_CHANGES = [list of new items not in yesterday's snapshot]
 JELLYFISH_CHANGES = [list of new items not in yesterday's snapshot]
+ENTELLIGENCE_CHANGES = [list of new items not in yesterday's snapshot]
 ```
 
-### 6. Decide: send or silent exit
+### 7. Decide: send or silent exit
 
-If both `FAROS_CHANGES` and `JELLYFISH_CHANGES` are empty → exit:
+If `FAROS_CHANGES`, `JELLYFISH_CHANGES`, and `ENTELLIGENCE_CHANGES` are all empty → exit:
 ```
 <internal>Nothing to do this run.</internal>
 ```
 
 **Critical:** The `<` must be the very first character of your entire output. Do NOT write any summary, reasoning, or explanation before the `<internal>` tag.
 
-### 7. Generate HTML report
+### 8. Generate HTML report
 
 **Ação Necessária decision rule:**
 - If any change item matches a "Sinais de Alerta" entry (i.e. has `high-threat` class) → write **alertar founder**
@@ -205,6 +262,9 @@ Write to `/tmp/competitor-report-$TODAY.html`. Use clean, readable HTML with inl
   <h2>Jellyfish</h2>
   <!-- Same structure -->
 
+  <h2>Entelligence AI</h2>
+  <!-- Same structure -->
+
   <h2>Relevância para Dev Visibility</h2>
   <p>[Analysis: do any of these changes reduce our differentiation? Did threat level change?]</p>
 
@@ -225,7 +285,7 @@ Write to `/tmp/competitor-report-$TODAY.html`. Use clean, readable HTML with inl
 
 Use `high-threat` CSS class on items that match the "Sinais de Alerta" sections from the base analysis documents.
 
-### 8. Send HTML report by email
+### 9. Send HTML report by email
 
 Read the content of `/tmp/competitor-report-$TODAY.html` and send it as the email body:
 
@@ -235,7 +295,7 @@ Read the content of `/tmp/competitor-report-$TODAY.html` and send it as the emai
 - **mimeType:** `text/html`
 - **No attachments**
 
-### 9. Update Timeline in Basic Memory
+### 10. Update Timeline in Basic Memory
 
 Regardless of whether the email succeeded, update the persistent timeline document in `dev-visibility-product`.
 
@@ -279,9 +339,9 @@ Histórico cronológico de features, parcerias e movimentos estratégicos detect
 
 If the timeline update fails for any reason, continue silently — do not abort.
 
-> **If the Gmail send in step 8 failed:** continue to steps 9–11 anyway — the timeline and snapshots should still be saved. Only the email notification is skipped.
+> **If the Gmail send in step 9 failed:** continue to steps 10–12 anyway — the timeline and snapshots should still be saved. Only the email notification is skipped.
 
-### 10. Save today's snapshots to Basic Memory
+### 11. Save today's snapshots to Basic Memory
 
 Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product"` for each competitor:
 
@@ -321,9 +381,33 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 [Any banners, press releases, or notable homepage content]
 ```
 
-### 11. Create GitHub issues for Dev Visibility-relevant features
+**Title:** `$TODAY`
+**Directory:** `Concorrência/Entelligence AI`
+**Content:** Use this exact Markdown schema (omit sections with no data):
 
-For each item marked `[DEV_VISIBILITY_CANDIDATE]` in steps 3 and 4:
+```markdown
+## GitHub Repos
+- [repo] — [last pushed] — [description or notable changes]
+
+## Releases
+- [repo] [tag] — [published_at] — [key changes summary]
+
+## Documentation Changes
+[Changes in docs.entelligence.ai — new pages, updated features, new integrations]
+
+## Blog Posts
+- [title] — [date] — [url]
+
+## Product Page
+[Notable copy, positioning changes, new customer logos, or feature highlights]
+
+## Announcements
+[Any banners, press releases, or notable homepage content]
+```
+
+### 12. Create GitHub issues for Dev Visibility-relevant features
+
+For each item marked `[DEV_VISIBILITY_CANDIDATE]` in steps 3, 4, and 5:
 
 **a)** Check for duplicate issues to avoid noise:
 
