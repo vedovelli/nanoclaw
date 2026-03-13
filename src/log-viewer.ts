@@ -154,7 +154,7 @@ const HTML = `<!DOCTYPE html>
     </div>
     <div class="panel">
       <div class="panel-header">Dev Visibility</div>
-      <iframe src="https://devvis.com.br/admin" style="flex:1;border:none;width:100%;height:100%;"></iframe>
+      <iframe src="https://server.cogniscape.app/devvis" style="flex:1;border:none;width:100%;height:100%;"></iframe>
     </div>
   </div>
   <script>

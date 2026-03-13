@@ -551,11 +551,11 @@ async function runQuery(
         },
         aidevteam: {
           type: 'http' as const,
-          url: 'https://devvis.com.br/mcp-reader/mcp?customer_key=b1df051607857effb39f781294d36d37aad4d929a0b9e6e81989ea3e6a6bcb71',
+          url: 'https://server.cogniscape.app/mcp-reader/mcp?customer_key=b1df051607857effb39f781294d36d37aad4d929a0b9e6e81989ea3e6a6bcb71',
         },
         devvis: {
           type: 'http' as const,
-          url: 'https://devvis.com.br/mcp-reader/mcp?customer_key=f3a9c2e1b8d74650a1e2c3d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4',
+          url: 'https://server.cogniscape.app/mcp-reader/mcp?customer_key=f3a9c2e1b8d74650a1e2c3d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4',
         },
         linear: {
           type: 'http' as const,
