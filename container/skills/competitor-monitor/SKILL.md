@@ -17,6 +17,49 @@ Silent exit means your **entire output** is:
 ```
 The `<` must be the very first character. No explanation. No summary. Nothing outside those tags.
 
+## Factual Accuracy Rules — HARD REQUIREMENT
+
+**Every finding in the report MUST be a directly observable fact.** Violations of these rules produce dangerous false intelligence that leads to wrong strategic decisions.
+
+### No fabricated redirects
+
+- You MUST NOT claim that domain A redirects to domain B unless you have **explicit HTTP redirect evidence** from a `curl -sI -L` check (see below).
+- The `agent-browser` tool does NOT reliably report redirects. Browser rendering of a page is NOT proof of a redirect.
+- If you suspect a redirect, you MUST verify it with:
+
+```bash
+curl -sI -L --max-redirs 5 "https://[domain]" 2>&1 | grep -iE "^(HTTP/|location:)"
+```
+
+- Only report a redirect if the `Location:` header explicitly shows the target domain.
+- If `curl` shows a 200 OK with no `Location:` header, the domain is NOT redirecting — period.
+
+### No inferred relationships between competitors
+
+- You MUST NOT fabricate acquisition, merger, or partnership claims unless you find them in an **explicit press release, blog post, or official announcement** with a verifiable URL.
+- Seeing similar content on two sites is NOT evidence of a relationship.
+- Seeing that a domain is down or returning errors is NOT evidence of acquisition.
+
+### Source requirement
+
+- Every finding MUST include the exact source URL where it was observed.
+- If a source URL cannot be provided, the finding MUST be discarded.
+- "I observed this while browsing" is NOT a valid source — provide the specific page URL.
+
+### When in doubt, discard
+
+- If you are not 100% certain a finding is factual, **do not include it**.
+- It is FAR better to report "no changes" than to report fabricated changes.
+- A false positive wastes executive attention and erodes trust in the monitoring system.
+
+### Browser failure protocol
+
+- If `agent-browser` returns an error, empty content, or content you cannot parse → treat as "no data" for that source.
+- Do NOT attempt to "reconstruct" or "infer" what the page might contain.
+- Do NOT use your training data to fill in what a page "probably" shows.
+
+---
+
 ## Overview
 
 This skill does the following on every run:
@@ -110,9 +153,13 @@ gh api repos/faros-ai/faros-community-edition/pulls \
 
 Use `agent-browser` to fetch `https://faros.ai/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY — do not treat old posts as new findings.
 
+⚠️ **If the page loads a different domain or you suspect a redirect, STOP. Run `curl -sI -L "https://faros.ai/blog"` and check the `Location:` headers. Do NOT report a redirect unless `curl` confirms it. See "Factual Accuracy Rules" above.**
+
 **e) Clara product page:**
 
 Use `agent-browser` to fetch `https://faros.ai/clara`. Note any visible changes, new features, or new copy compared to what was in yesterday's snapshot.
+
+⚠️ **Report only what the page actually shows. Do NOT infer domain ownership or acquisitions from page content. See "Factual Accuracy Rules" above.**
 
 **f) Tag Dev Visibility candidates:**
 
@@ -133,6 +180,8 @@ Jellyfish is closed source — no GitHub to query. Use browser only.
 
 Use `agent-browser` to fetch `https://jellyfish.co/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY — do not treat old posts as new findings.
 
+⚠️ **If the page loads a different domain or you suspect a redirect, STOP. Run `curl -sI -L "https://jellyfish.co/blog"` and check the `Location:` headers. Do NOT report a redirect unless `curl` confirms it. See "Factual Accuracy Rules" above.**
+
 **b) AI Impact Dashboard page:**
 
 Use `agent-browser` to fetch `https://jellyfish.co/platform/jellyfish-ai-impact/`. Note any changes in supported tools or feature descriptions compared to yesterday's snapshot.
@@ -140,6 +189,8 @@ Use `agent-browser` to fetch `https://jellyfish.co/platform/jellyfish-ai-impact/
 **c) Homepage/announcements:**
 
 Use `agent-browser` to check `https://jellyfish.co` for any banners or featured announcements.
+
+⚠️ **Report only what is directly visible on the page. Do NOT infer corporate events (acquisitions, mergers) from page design or content similarities with other competitors. See "Factual Accuracy Rules" above.**
 
 **d) Tag Dev Visibility candidates:**
 
@@ -180,6 +231,8 @@ Use `agent-browser` to fetch `https://docs.entelligence.ai/`. Compare the page s
 - Changes to Team Insights / Performance Review features
 - New product capabilities
 
+⚠️ **If the docs site loads a different domain or you suspect a redirect, STOP. Run `curl -sI -L "https://docs.entelligence.ai/"` and check the `Location:` headers. Do NOT claim the domain redirects unless `curl` confirms it. See "Factual Accuracy Rules" above.**
+
 **c) Blog / announcements:**
 
 Use `agent-browser` to fetch `https://www.entelligence.ai/blog` (or homepage if no dedicated blog path). Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
@@ -187,6 +240,8 @@ Use `agent-browser` to fetch `https://www.entelligence.ai/blog` (or homepage if 
 **d) Product page:**
 
 Use `agent-browser` to fetch `https://www.entelligence.ai/`. Note any changes in positioning, feature highlights, new customer logos, or announcements compared to yesterday's snapshot.
+
+⚠️ **Report only what the page actually shows. Do NOT claim domain ownership changes or redirects without `curl -sI -L` verification. See "Factual Accuracy Rules" above.**
 
 **e) Tag Dev Visibility candidates:**
 
@@ -200,6 +255,14 @@ Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDI
 If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL sources in this step fail, treat Entelligence AI as having no changes for today.
 
 ### 6. Compare with yesterday
+
+**⚠️ FACTUAL VERIFICATION CHECKPOINT — before proceeding, review every finding from steps 3–5:**
+1. Does every finding have a specific, verifiable source URL?
+2. Did any finding claim a redirect? If so, was it verified with `curl -sI -L`? Remove any unverified redirect claim.
+3. Did any finding claim an acquisition, merger, or partnership? If so, is there a specific press release or announcement URL? Remove any claim without an explicit source.
+4. Could any finding be a hallucination (something your training data "knows" but that wasn't actually observed on the page today)? If in doubt, remove it.
+
+**If after this checkpoint all findings are removed, proceed to step 7 (silent exit).**
 
 For each competitor, answer these questions using the monitoring questions from Basic Memory and what you found:
 
