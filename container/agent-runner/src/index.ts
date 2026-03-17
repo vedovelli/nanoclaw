@@ -505,7 +505,6 @@ async function runQuery(
         'mcp__basic-memory-cloud__*',
         'mcp__aidevteam__*',
         'mcp__cogniscape__*',
-        'mcp__linear__*',
         /* ved custom end */
       ],
       env: sdkEnv,
@@ -556,11 +555,6 @@ async function runQuery(
         cogniscape: {
           type: 'http' as const,
           url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=f3a9c2e1b8d74650a1e2c3d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4',
-        },
-        linear: {
-          type: 'http' as const,
-          url: 'https://mcp.linear.app/mcp',
-          headers: { Authorization: `Bearer ${sdkEnv.LINEAR_API_KEY || ''}` },
         },
         /* ved custom end */
       },
