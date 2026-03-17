@@ -504,7 +504,7 @@ async function runQuery(
         'mcp__flare__*',
         'mcp__basic-memory-cloud__*',
         'mcp__aidevteam__*',
-        'mcp__devvis__*',
+        'mcp__cogniscape__*',
         'mcp__linear__*',
         /* ved custom end */
       ],
@@ -551,11 +551,11 @@ async function runQuery(
         },
         aidevteam: {
           type: 'http' as const,
-          url: 'https://server.cogniscape.app/mcp-reader/mcp?customer_key=b1df051607857effb39f781294d36d37aad4d929a0b9e6e81989ea3e6a6bcb71',
+          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=b1df051607857effb39f781294d36d37aad4d929a0b9e6e81989ea3e6a6bcb71',
         },
-        devvis: {
+        cogniscape: {
           type: 'http' as const,
-          url: 'https://server.cogniscape.app/mcp-reader/mcp?customer_key=f3a9c2e1b8d74650a1e2c3d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4',
+          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=e57e03d406df41a98a086938e2d1910adff63d5e22014169ae02dde11ea6f8ed',
         },
         linear: {
           type: 'http' as const,
