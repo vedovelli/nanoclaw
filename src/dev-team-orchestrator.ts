@@ -546,12 +546,13 @@ TASK|<issue_number>|<senior|junior>|<branch_name>
   const taskLines = result.split('\n').filter(l => l.startsWith('TASK|'));
   state.tasks = taskLines.map(line => {
     const [, issue, assignee, branch] = line.split('|');
+    const parsed = parseInt(issue?.trim(), 10);
     return {
-      issue: parseInt(issue, 10),
-      assignee: assignee as 'senior' | 'junior',
+      issue: Number.isNaN(parsed) ? null : parsed,
+      assignee: assignee?.trim() as 'senior' | 'junior',
       pr: null,
       status: 'pending' as const,
-      branch: branch || null,
+      branch: branch?.trim() || null,
     };
   });
 
