@@ -238,7 +238,7 @@ function buildVolumeMounts(
     });
   }
 
-  // mcp-remote OAuth token cache (used by Linear MCP and other OAuth-based MCP servers)
+  // mcp-remote OAuth token cache (used by OAuth-based MCP servers)
   const mcpAuthDir = path.join(homeDir, '.mcp-auth');
   if (fs.existsSync(mcpAuthDir)) {
     mounts.push({
@@ -334,7 +334,6 @@ function buildContainerArgs(
     'GITHUB_PERSONAL_ACCESS_TOKEN',
     'FLARE_API_TOKEN',
     'BASIC_MEMORY_API_KEY',
-    'LINEAR_API_KEY',
   ]);
   for (const [key, value] of Object.entries(mcpSecrets)) {
     if (value) args.push('-e', `${key}=${value}`);

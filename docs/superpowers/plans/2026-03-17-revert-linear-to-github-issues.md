@@ -1,3 +1,52 @@
+# Revert Linear to GitHub Issues — Implementation Plan
+
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Revert all AI Dev Team issue tracking from Linear back to GitHub Issues.
+
+**Architecture:** Starting from the pre-Linear baseline of `dev-team-orchestrator.ts` (commit `947757e~1`), re-apply post-Linear improvements (dysfunction mode, hardening, exports) with all prompts targeting GitHub CLI instead of Linear MCP. Remove Linear MCP from agent-runner and container-runner configurations.
+
+**Tech Stack:** TypeScript, GitHub CLI (`gh`), Claude Agent SDK
+
+---
+
+### Task 1: Replace dev-team-orchestrator.ts with pre-Linear baseline + all improvements
+
+**Files:**
+- Replace: `src/dev-team-orchestrator.ts`
+
+This is the largest task. We write the complete file starting from the pre-Linear baseline and layering on all post-Linear improvements with GitHub-native prompts.
+
+- [ ] **Step 1: Write the complete orchestrator file**
+
+Replace `src/dev-team-orchestrator.ts` entirely with the merged version. Key changes from current:
+- Remove `LINEAR_PROJECT` and `LINEAR_TEAM` constants
+- Restore `postPlanningProgress()` function (uses `gh issue comment` via tmpFile)
+- `SprintTask.issue`: `string | null` → `number | null`
+- `SprintState.planning_issue`: `string | null` → `number | null`
+- `SprintState.task_under_review`: `string | null` → `number | null`
+- Keep: `SprintTask.status` includes `'skipped_dysfunction'`
+- Keep: `SprintTask.merge_attempts?: number`
+- Keep: `SprintState.dysfunctionMode: boolean`
+- Keep: `readState()` and `runAgent()` exported
+- Keep: `runAgent()` has `dysfunctionMode` parameter
+- Keep: All dysfunction mode behaviors (debate skip, dev skip, review skip)
+- Keep: All hardening (PR validation, execSync merge, merge_attempts pause)
+- All prompts use `gh issue`/`gh api` instead of Linear MCP
+- `startNewSprint`: `gh issue create` + parse `ISSUE_NUMBER=<number>`
+- `startDebate`: `gh issue comment`
+- `continueDebate`: `gh issue view --comments` + `gh issue comment`
+- Consensus check: `gh issue view --comments`
+- `startDev`: `gh issue view --comments` + `gh issue create` for tasks + `postPlanningProgress()`
+- `checkDevProgress`: `gh issue view` + `postPlanningProgress()`
+- `processReview`: `gh api pulls/comments` + `postPlanningProgress()`
+- `authorFixTask`: `gh api pulls/comments` + `postPlanningProgress()`
+- `processMerge`: `postPlanningProgress()` instead of Linear agent
+- `finishSprint`: `postPlanningProgress()` + `gh issue close` (no Linear agent call)
+
+The complete file content follows. Write this to `src/dev-team-orchestrator.ts`:
+
+```typescript
 import fs from 'fs';
 import path from 'path';
 import { ChildProcess, exec, execSync } from 'child_process';
@@ -546,13 +595,12 @@ TASK|<issue_number>|<senior|junior>|<branch_name>
   const taskLines = result.split('\n').filter(l => l.startsWith('TASK|'));
   state.tasks = taskLines.map(line => {
     const [, issue, assignee, branch] = line.split('|');
-    const parsed = parseInt(issue?.trim(), 10);
     return {
-      issue: Number.isNaN(parsed) ? null : parsed,
-      assignee: assignee?.trim() as 'senior' | 'junior',
+      issue: parseInt(issue, 10),
+      assignee: assignee as 'senior' | 'junior',
       pr: null,
       status: 'pending' as const,
-      branch: branch?.trim() || null,
+      branch: branch || null,
     };
   });
 
@@ -1168,3 +1216,229 @@ async function finishSprint(state: SprintState): Promise<string> {
 
   return `Sprint #${state.sprint_number} complete. Next sprint in ~30 minutes.`;
 }
+```
+
+- [ ] **Step 2: Run typecheck**
+
+Run: `npm run typecheck`
+Expected: PASS (no type errors)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add .
+git commit -m "feat: revert dev-team-orchestrator from Linear back to GitHub Issues
+
+Restores all sprint/issue management to GitHub Issues via gh CLI.
+Preserves post-Linear improvements: dysfunction mode, MERGE/DEV
+hardening, merge_attempts auto-pause, PR validation fallbacks."
+```
+
+---
+
+### Task 2: Restore orchestrator-prompt.md to pre-Linear version
+
+**Files:**
+- Replace: `data/dev-team/orchestrator-prompt.md`
+
+- [ ] **Step 1: Write the pre-Linear prompt**
+
+```markdown
+# Sprint Orchestrator
+
+You are the Sprint Orchestrator for a dev team simulation. You manage the sprint lifecycle for two developers (Carlos and Ana) working on a React/TypeScript SPA.
+
+## Your Role
+
+You make decisions about:
+- Whether the planning debate has reached consensus
+- How to split tasks between the two developers (non-conflicting)
+- When a PR is ready to merge
+- What the next sprint should focus on
+
+## Current State
+
+The sprint state is provided in your prompt. Based on the current state, execute the next action.
+
+## Rules
+
+1. Always output valid JSON with your decision
+2. Tasks must not have file conflicts between developers
+3. Each sprint should have 2-4 tasks total
+4. Senior (Carlos) gets architectural/complex tasks
+5. Junior (Ana) gets UI/component tasks
+6. Always use GitHub CLI (`gh`) for all GitHub operations
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add .
+git commit -m "docs: restore orchestrator-prompt.md to GitHub-only rules
+
+Removes Linear Issue Hierarchy and Status Management sections."
+```
+
+---
+
+### Task 3: Remove Linear MCP from agent-runner
+
+**Files:**
+- Modify: `container/agent-runner/src/index.ts:508` (remove `mcp__linear__*`)
+- Modify: `container/agent-runner/src/index.ts:560-564` (remove `linear` MCP server)
+
+- [ ] **Step 1: Remove `mcp__linear__*` from allowed tools array**
+
+In the `allowedTools` array, remove the line `'mcp__linear__*',`.
+
+- [ ] **Step 2: Remove `linear` MCP server from `mcpServers` object**
+
+Remove the entire `linear` block:
+```typescript
+        linear: {
+          type: 'http' as const,
+          url: 'https://mcp.linear.app/mcp',
+          headers: { Authorization: `Bearer ${sdkEnv.LINEAR_API_KEY || ''}` },
+        },
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add .
+git commit -m "fix: remove Linear MCP from agent-runner configuration
+
+Agents no longer need Linear access — all issue tracking uses GitHub."
+```
+
+---
+
+### Task 4: Remove LINEAR_API_KEY from container-runner and update comment
+
+**Files:**
+- Modify: `src/container-runner.ts:241` (update comment)
+- Modify: `src/container-runner.ts:337` (remove `LINEAR_API_KEY`)
+
+- [ ] **Step 1: Update the mcp-auth comment**
+
+Change line 241 from:
+```typescript
+  // mcp-remote OAuth token cache (used by Linear MCP and other OAuth-based MCP servers)
+```
+to:
+```typescript
+  // mcp-remote OAuth token cache (used by OAuth-based MCP servers)
+```
+
+- [ ] **Step 2: Remove `LINEAR_API_KEY` from env passthrough**
+
+In the `readEnvFile` call, remove `'LINEAR_API_KEY'` from the array.
+
+- [ ] **Step 3: Run typecheck**
+
+Run: `npm run typecheck`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .
+git commit -m "fix: remove LINEAR_API_KEY from container env passthrough"
+```
+
+---
+
+### Task 5: Remove Linear from session settings
+
+**Files:**
+- Modify: `data/sessions/background/.claude/settings.json`
+
+- [ ] **Step 1: Remove `linear` MCP server entry**
+
+Remove the `"linear"` block (lines 15-22) from the `mcpServers` object in `data/sessions/background/.claude/settings.json`.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add .
+git commit -m "fix: remove Linear MCP from background session settings"
+```
+
+---
+
+### Task 6: Reset sprint-state.json
+
+**Files:**
+- Replace: `data/dev-team/sprint-state.json`
+
+- [ ] **Step 1: Write clean IDLE state**
+
+```json
+{
+  "sprint_number": 78,
+  "state": "IDLE",
+  "paused": false,
+  "started_at": null,
+  "planning_issue": null,
+  "tasks": [],
+  "next_action_at": null,
+  "upstream_repo": "vedovelli/ai-dev-team-simulation",
+  "senior_fork": "https://github.com/vedovelli-ai-team-sr/ai-dev-team-simulation",
+  "junior_fork": "https://github.com/vedovelli-ai-team-jr/ai-dev-team-simulation",
+  "debate_round": 0,
+  "review_round": 0,
+  "task_under_review": null,
+  "dysfunctionMode": false
+}
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add .
+git commit -m "fix: reset sprint state to IDLE for GitHub Issues migration"
+```
+
+---
+
+### Task 7: Build, validate, and deploy
+
+- [ ] **Step 1: Run full build**
+
+Run: `npm run build`
+Expected: PASS
+
+- [ ] **Step 2: Run tests**
+
+Run: `npm run test`
+Expected: PASS
+
+- [ ] **Step 3: Validate zero Linear references**
+
+Run: `grep -ri linear src/ container/agent-runner/src/ data/dev-team/ --include="*.ts" --include="*.md"`
+Expected: No output (zero matches)
+
+Run: `grep -ri linear data/sessions/*/.claude/settings.json`
+Expected: No output (zero matches)
+
+- [ ] **Step 4: Rebuild container**
+
+Run: `./container/build.sh`
+Expected: Build succeeds
+
+- [ ] **Step 5: Sync agent-runner-src to sessions**
+
+Run: `for dir in data/sessions/*/agent-runner-src; do cp -r container/agent-runner/src/. "$dir/"; done`
+
+- [ ] **Step 6: Validate session copies**
+
+Run: `grep -i linear data/sessions/*/agent-runner-src/index.ts`
+Expected: No output (zero matches)
+
+- [ ] **Step 7: Restart service**
+
+Run: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`
+
+- [ ] **Step 8: Commit (if any validation fixes needed)**
+
+Only if previous steps required fixes.

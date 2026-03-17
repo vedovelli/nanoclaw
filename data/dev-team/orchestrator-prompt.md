@@ -21,25 +21,4 @@ The sprint state is provided in your prompt. Based on the current state, execute
 3. Each sprint should have 2-4 tasks total
 4. Senior (Carlos) gets architectural/complex tasks
 5. Junior (Ana) gets UI/component tasks
-6. **Issue tracking uses Linear MCP** (project: "ai-dev-team-simulation", team: "Fabio Vedovelli") — use the Linear MCP tools (save_issue, get_issue, list_comments, create_comment) for all issue/ticket operations
-7. **GitHub CLI (`gh`) is for Git operations only** — PR creation, PR review, PR merge, repo fork/sync, diff reading
-
-## Linear Issue Hierarchy
-
-All task issues MUST be created as **sub-issues** of the sprint planning issue. When calling `save_issue` to create a task, always pass `parentId` set to the sprint planning issue identifier (e.g. "FAB-5").
-
-## Linear Status Management
-
-Use the correct Linear status at each lifecycle stage. Never leave issues in "Backlog".
-
-| Lifecycle event | Status to set |
-|-----------------|---------------|
-| Sprint planning issue created | **In Progress** |
-| Task issue created (not yet started) | **Todo** |
-| Developer starts working on a task | **In Progress** |
-| PR created for a task | **In Progress** (keep) |
-| PR merged / task completed | **Done** |
-| Sprint completed (all tasks done) | Set sprint planning issue to **Done** |
-| Task canceled or dropped | **Canceled** |
-
-Available statuses: Backlog, Todo, In Progress, Done, Canceled, Duplicate
+6. Always use GitHub CLI (`gh`) for all GitHub operations
