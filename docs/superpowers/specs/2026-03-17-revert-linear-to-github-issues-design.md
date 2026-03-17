@@ -14,6 +14,7 @@
 | `container/agent-runner/src/index.ts` | Remove Linear MCP server config and `mcp__linear__*` from allowed tools |
 | `src/container-runner.ts` | Remove `LINEAR_API_KEY` from env passthrough. Update `~/.mcp-auth` comment to remove Linear reference. Keep mount. |
 | `data/dev-team/sprint-state.json` | Reset to IDLE with `number` types |
+| `data/sessions/*/.claude/settings.json` | Remove `linear` MCP server entry if present |
 
 ### Post-deploy Propagation
 
@@ -142,6 +143,7 @@ Reset to clean IDLE state preserving current sprint number:
 4. Edit `agent-runner/src/index.ts` — remove Linear MCP
 5. Edit `container-runner.ts` — remove `LINEAR_API_KEY`, update `~/.mcp-auth` comment
 6. Reset `sprint-state.json`
+6b. Remove `linear` MCP server from `data/sessions/*/.claude/settings.json` if present
 7. `npm run typecheck` + `npm run build`
 8. `./container/build.sh`
 9. Sync agent-runner-src to sessions: `for dir in data/sessions/*/agent-runner-src; do cp -r container/agent-runner/src/. "$dir/"; done`
@@ -153,6 +155,7 @@ Reset to clean IDLE state preserving current sprint number:
 - `npm run build` — compiles clean
 - `grep -ri linear src/ container/agent-runner/src/ data/dev-team/ --include="*.ts" --include="*.md"` — zero matches
 - `grep -i linear data/sessions/*/agent-runner-src/index.ts` — zero matches (confirms session sync)
+- `grep -ri linear data/sessions/*/.claude/settings.json` — zero matches (confirms session Claude configs cleaned)
 - `npm run test` — all tests pass
 
 ## Risks
