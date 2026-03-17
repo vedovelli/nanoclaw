@@ -12,8 +12,12 @@
 | `src/dev-team-orchestrator.ts` | Base from pre-Linear commit (`947757e~1`) + re-apply post-Linear improvements |
 | `data/dev-team/orchestrator-prompt.md` | Restore pre-Linear version (6 rules, no Linear references) |
 | `container/agent-runner/src/index.ts` | Remove Linear MCP server config and `mcp__linear__*` from allowed tools |
-| `src/container-runner.ts` | Remove `LINEAR_API_KEY` from env passthrough. Keep `~/.mcp-auth` mount |
+| `src/container-runner.ts` | Remove `LINEAR_API_KEY` from env passthrough. Update `~/.mcp-auth` comment to remove Linear reference. Keep mount. |
 | `data/dev-team/sprint-state.json` | Reset to IDLE with `number` types |
+
+### Post-deploy Propagation
+
+After editing `container/agent-runner/src/index.ts`, the session copies at `data/sessions/*/agent-runner-src/` must be synced (step 9). These are the actually-mounted copies at runtime.
 
 ### Files NOT Touched
 
@@ -109,10 +113,10 @@ Restore pre-Linear version:
 
 ## Changes to `sprint-state.json`
 
-Reset to clean IDLE state with current sprint number (75):
+Reset to clean IDLE state preserving current sprint number:
 ```json
 {
-  "sprint_number": 75,
+  "sprint_number": 78,
   "state": "IDLE",
   "paused": false,
   "started_at": null,
@@ -131,22 +135,24 @@ Reset to clean IDLE state with current sprint number (75):
 
 ## Execution Order
 
+0. Stop service or pause sprint to prevent orchestrator ticks during edits
 1. Extract pre-Linear `dev-team-orchestrator.ts` as base
 2. Apply layers 1-10 (hardening, dysfunction, exports, prompt rewrites)
 3. Restore `orchestrator-prompt.md` to pre-Linear
 4. Edit `agent-runner/src/index.ts` — remove Linear MCP
-5. Edit `container-runner.ts` — remove `LINEAR_API_KEY`
+5. Edit `container-runner.ts` — remove `LINEAR_API_KEY`, update `~/.mcp-auth` comment
 6. Reset `sprint-state.json`
 7. `npm run typecheck` + `npm run build`
 8. `./container/build.sh`
-9. Sync agent-runner-src to sessions
+9. Sync agent-runner-src to sessions: `for dir in data/sessions/*/agent-runner-src; do cp -r container/agent-runner/src/. "$dir/"; done`
 10. Restart service
 
 ## Validation
 
 - `npm run typecheck` — types consistent (`number` fields)
 - `npm run build` — compiles clean
-- `grep -i linear src/dev-team-orchestrator.ts` — zero matches
+- `grep -ri linear src/ container/agent-runner/src/ data/dev-team/ --include="*.ts" --include="*.md"` — zero matches
+- `grep -i linear data/sessions/*/agent-runner-src/index.ts` — zero matches (confirms session sync)
 - `npm run test` — all tests pass
 
 ## Risks
