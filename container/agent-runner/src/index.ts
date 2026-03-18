@@ -503,7 +503,6 @@ async function runQuery(
         'mcp__calendar__*',
         'mcp__flare__*',
         'mcp__basic-memory-cloud__*',
-        'mcp__aidevteam__*',
         'mcp__cogniscape__*',
         /* ved custom end */
       ],
@@ -548,13 +547,9 @@ async function runQuery(
           url: 'https://cloud.basicmemory.com/mcp',
           headers: { Authorization: `Bearer ${sdkEnv.BASIC_MEMORY_API_KEY || ''}` },
         },
-        aidevteam: {
-          type: 'http' as const,
-          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=b1df051607857effb39f781294d36d37aad4d929a0b9e6e81989ea3e6a6bcb71',
-        },
         cogniscape: {
           type: 'http' as const,
-          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=f3a9c2e1b8d74650a1e2c3d4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4',
+          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=5a6344b2327dd01d10411b7207f7f888cf319670bc836b92960630eb412058b7',
         },
         /* ved custom end */
       },
