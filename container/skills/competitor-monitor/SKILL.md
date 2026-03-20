@@ -23,13 +23,13 @@ The `<` must be the very first character. No explanation. No summary. Nothing ou
 
 ```bash
 # Fetch full page text
-node /app/crawlee-fetch.mjs "https://example.com/blog"
+node /app/crawlee-fetch.js "https://example.com/blog"
 
 # Fetch only specific elements (e.g. blog post titles and summaries)
-node /app/crawlee-fetch.mjs "https://example.com/blog" --selector "article"
+node /app/crawlee-fetch.js "https://example.com/blog" --selector "article"
 
 # Custom timeout (default 30s)
-node /app/crawlee-fetch.mjs "https://example.com/blog" --timeout 45000
+node /app/crawlee-fetch.js "https://example.com/blog" --timeout 45000
 ```
 
 **Fallback chain:** `crawlee-fetch` → `agent-browser` → skip (no data).

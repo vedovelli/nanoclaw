@@ -53,11 +53,6 @@ RUN npm install -g agent-browser @anthropic-ai/claude-code \
     mcp-remote
 # ved custom end
 
-# ved custom
-# Install Crawlee with Playwright stealth for anti-bot web scraping (competitor-monitor)
-RUN npm install -g crawlee playwright-extra puppeteer-extra-plugin-stealth
-# ved custom end
-
 # Create app directory
 WORKDIR /app
 
