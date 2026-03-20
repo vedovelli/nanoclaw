@@ -17,11 +17,31 @@ Silent exit means your **entire output** is:
 ```
 The `<` must be the very first character. No explanation. No summary. Nothing outside those tags.
 
+## Crawlee Stealth Scraper — PRIMARY TOOL FOR BLOG/PAGE CONTENT
+
+**Use `crawlee-fetch` as the primary tool for extracting content from competitor blogs and product pages.** It uses Playwright with anti-bot stealth plugins, which bypasses protections that block plain `agent-browser`.
+
+```bash
+# Fetch full page text
+node /app/crawlee-fetch.mjs "https://example.com/blog"
+
+# Fetch only specific elements (e.g. blog post titles and summaries)
+node /app/crawlee-fetch.mjs "https://example.com/blog" --selector "article"
+
+# Custom timeout (default 30s)
+node /app/crawlee-fetch.mjs "https://example.com/blog" --timeout 45000
+```
+
+**Fallback chain:** `crawlee-fetch` → `agent-browser` → skip (no data).
+If `crawlee-fetch` fails (exit code 1), try `agent-browser` as fallback. If both fail, treat as "no data".
+
+---
+
 ## curl-first Protocol — MANDATORY FOR EVERY URL
 
-**You MUST run `curl` BEFORE using `agent-browser` on ANY URL. No exceptions.**
+**You MUST run `curl` BEFORE using `crawlee-fetch` or `agent-browser` on ANY URL. No exceptions.**
 
-For every URL you plan to visit with `agent-browser`, first run:
+For every URL you plan to visit, first run:
 
 ```bash
 curl -sI -L --max-redirs 5 "$URL" 2>&1 | grep -iE "^(HTTP/|location:)"
@@ -31,7 +51,7 @@ Then follow this decision tree:
 
 | curl result | Action |
 |-------------|--------|
-| `HTTP/2 200` with NO `Location:` header | URL is live, no redirect. Proceed with `agent-browser` to read content. |
+| `HTTP/2 200` with NO `Location:` header | URL is live, no redirect. Proceed with `crawlee-fetch` to read content. |
 | `Location:` header present | Redirect confirmed. Record the EXACT redirect chain from curl. Do NOT use browser. |
 | curl fails / times out / 4xx / 5xx | Skip this URL entirely. Treat as "no data". |
 
@@ -145,7 +165,7 @@ curl -sI -L --max-redirs 5 "https://faros.ai/blog" 2>&1 | grep -iE "^(HTTP/|loca
 - If curl fails → skip. No data for this URL.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to fetch `https://faros.ai/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://faros.ai/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
 
 **e) Clara product page:**
 
@@ -158,7 +178,7 @@ curl -sI -L --max-redirs 5 "https://faros.ai/clara" 2>&1 | grep -iE "^(HTTP/|loc
 - If curl fails → skip. No data.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to fetch `https://faros.ai/clara`. Note any visible changes, new features, or new copy compared to what was in yesterday's snapshot.
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://faros.ai/clara`. Note any visible changes, new features, or new copy compared to what was in yesterday's snapshot.
 
 **f) Tag Dev Visibility candidates:**
 
@@ -169,7 +189,7 @@ For each item found in sub-steps a–e, check against the PRD capabilities read 
 
 Store the list of candidates separately from the general change list.
 
-If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Faros AI as having no changes for today.
+If both `crawlee-fetch` and `agent-browser` fail or return no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Faros AI as having no changes for today.
 
 ### 4. Research Jellyfish
 
@@ -186,7 +206,7 @@ curl -sI -L --max-redirs 5 "https://jellyfish.co/blog" 2>&1 | grep -iE "^(HTTP/|
 - If curl fails → skip. No data.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to fetch `https://jellyfish.co/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://jellyfish.co/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
 
 **b) AI Impact Dashboard page:**
 
@@ -198,7 +218,7 @@ curl -sI -L --max-redirs 5 "https://jellyfish.co/platform/jellyfish-ai-impact/" 
 - If curl shows redirect or fails → skip. No data.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to fetch `https://jellyfish.co/platform/jellyfish-ai-impact/`. Note any changes in supported tools or feature descriptions compared to yesterday's snapshot.
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://jellyfish.co/platform/jellyfish-ai-impact/`. Note any changes in supported tools or feature descriptions compared to yesterday's snapshot.
 
 **c) Homepage/announcements:**
 
@@ -210,13 +230,13 @@ curl -sI -L --max-redirs 5 "https://jellyfish.co" 2>&1 | grep -iE "^(HTTP/|locat
 - If curl shows redirect or fails → skip. No data.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to check `https://jellyfish.co` for any banners or featured announcements.
+Use `crawlee-fetch` (with `agent-browser` as fallback) to check `https://jellyfish.co` for any banners or featured announcements.
 
 **d) Tag Dev Visibility candidates:**
 
 Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDIDATE]` if it aligns with PRD capabilities or reduces Dev Visibility's differentiation.
 
-If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Jellyfish as having no changes for today.
+If both `crawlee-fetch` and `agent-browser` fail or return no usable content for any sub-step, treat that source as "no data" and continue. If ALL browser sources in this step fail, treat Jellyfish as having no changes for today.
 
 ### 5. Research Entelligence AI
 
@@ -255,7 +275,7 @@ curl -sI -L --max-redirs 5 "https://docs.entelligence.ai/" 2>&1 | grep -iE "^(HT
 - If curl fails → skip. No data.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to fetch `https://docs.entelligence.ai/`. Compare the page structure, feature descriptions, and integration list against yesterday's snapshot. Pay particular attention to:
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://docs.entelligence.ai/`. Compare the page structure, feature descriptions, and integration list against yesterday's snapshot. Pay particular attention to:
 - New integration pages (IDE, MCP, or third-party tools)
 - Changes to Team Insights / Performance Review features
 - New product capabilities
@@ -270,7 +290,7 @@ curl -sI -L --max-redirs 5 "https://www.entelligence.ai/blog" 2>&1 | grep -iE "^
 - If curl shows redirect or fails → skip. No data.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to fetch `https://www.entelligence.ai/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://www.entelligence.ai/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
 
 **d) Product page:**
 
@@ -282,7 +302,7 @@ curl -sI -L --max-redirs 5 "https://www.entelligence.ai/" 2>&1 | grep -iE "^(HTT
 - If curl shows redirect or fails → skip. No data.
 
 **Step 2 — content extraction (only if curl shows 200, no redirect):**
-Use `agent-browser` to fetch `https://www.entelligence.ai/`. Note any changes in positioning, feature highlights, new customer logos, or announcements compared to yesterday's snapshot.
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://www.entelligence.ai/`. Note any changes in positioning, feature highlights, new customer logos, or announcements compared to yesterday's snapshot.
 
 **e) Tag Dev Visibility candidates:**
 
@@ -293,7 +313,7 @@ Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDI
 - MCP integration
 - IDE integration
 
-If `agent-browser` fails or returns no usable content for any sub-step, treat that source as "no data" and continue. If ALL sources in this step fail, treat Entelligence AI as having no changes for today.
+If both `crawlee-fetch` and `agent-browser` fail or return no usable content for any sub-step, treat that source as "no data" and continue. If ALL sources in this step fail, treat Entelligence AI as having no changes for today.
 
 ### 6. Compare with yesterday
 
