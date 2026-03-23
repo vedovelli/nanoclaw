@@ -48,14 +48,14 @@ git branch --show-current
 Before any changes are made, capture a per-file snapshot of all `ved custom` markers. This baseline is used in step 12 to detect silently dropped customizations.
 
 ```bash
-grep -rn "ved custom" src/ container/ --include="*.ts" --include="Dockerfile" --include="*.sh" | grep -v "ved custom end" | awk -F: '{print $1}' | sort | uniq -c | sort -rn
+grep -rn "ved custom" src/ container/ scripts/ --include="*.ts" --include="Dockerfile" --include="*.sh" | grep -v "ved custom end" | awk -F: '{print $1}' | sort | uniq -c | sort -rn
 ```
 
-Save the output as the **marker baseline**. Record:
+Hold this output in your working context — you will compare against it in steps 6b and 12. Do not write it to a file. Record:
 - The total count of opening `ved custom` markers
 - The list of files and how many opening markers each file has
 
-This data is essential — without it, step 12 cannot detect dropped customizations.
+This data is essential — without it, steps 6b and 12 cannot detect dropped customizations.
 
 ## 2. Fetch upstream
 
@@ -102,7 +102,9 @@ Compare `filesChanged` from the preview against the marker baseline captured in 
 
 ...is a **silent overwrite risk**. The merge tool will replace it with the upstream version without triggering a conflict, silently dropping our customizations.
 
-**Flag these files to the user** with a warning: "These files have our customizations but the merge tool does not detect a conflict — they may be silently overwritten: {list}". After the merge (step 6/7), these files must be individually verified in the regression check.
+**Flag these files to the user** with a warning: "These files have our customizations but the merge tool does not detect a conflict — they may be silently overwritten: {list}". These files will be verified immediately after the merge in step 6b.
+
+Also check `filesDeleted` against the marker baseline. Any file in `filesDeleted` that has markers in the baseline is a **guaranteed customization loss** — upstream is removing a file that contains our code. **Flag this as a blocker** and ask the user how to handle it (relocate the customization to another file, or keep our version of the file).
 
 ## 4. Confirm
 
@@ -137,6 +139,26 @@ Parse the JSON output. The result has: `success`, `previousVersion`, `newVersion
 **If customPatchFailures exist:** Warn the user which custom patches failed to re-apply. These may need manual attention after the update.
 
 **If skillReapplyResults has false entries:** Warn the user which skill tests failed after re-application.
+
+## 6b. Protect flagged customizations (CRITICAL)
+
+**This step fires regardless of whether there are conflicts.** Immediately after step 6, check every file that was flagged as a "silent overwrite risk" in step 3:
+
+```bash
+grep -c "ved custom" <flagged-file>
+```
+
+For each flagged file, compare the marker count against the baseline from step 1:
+
+- **If the count matches the baseline:** The file survived the merge intact. Move on.
+- **If the count is 0 or lower than the baseline:** The file was silently overwritten. Restore the `ved custom` blocks immediately:
+
+  1. Extract the original version from main: `git show main:<file>`
+  2. Identify the `ved custom` blocks in the main version
+  3. Splice them back into the current (upstream) version at the correct locations
+  4. Write the restored file
+
+**Do not proceed to step 7 until every flagged file has been verified and restored if needed.** This is the proactive fix — step 12 is only the safety net.
 
 ## 7. Handle conflicts
 
@@ -245,7 +267,7 @@ This is the most important step. A silent overwrite can remove our customization
 Capture the current per-file marker counts:
 
 ```bash
-grep -rn "ved custom" src/ container/ --include="*.ts" --include="Dockerfile" --include="*.sh" | grep -v "ved custom end" | awk -F: '{print $1}' | sort | uniq -c | sort -rn
+grep -rn "ved custom" src/ container/ scripts/ --include="*.ts" --include="Dockerfile" --include="*.sh" | grep -v "ved custom end" | awk -F: '{print $1}' | sort | uniq -c | sort -rn
 ```
 
 Compare this output **line by line** against the marker baseline captured in step 1:
@@ -255,6 +277,8 @@ Compare this output **line by line** against the marker baseline captured in ste
 3. If any file from the baseline is **completely absent** from the current output, all its customizations were silently overwritten — this is the most dangerous case. Restore the `ved custom` blocks from `main` using `git show main:<file>`.
 
 **This per-file check is what prevents silent overwrites.** A global count can be misleading — a new marker in one file can mask a dropped marker in another.
+
+To identify which specific block was dropped, diff the current file against main: `git diff main -- <file>` and look for removed `ved custom` sections. Restore only the missing blocks, keeping the upstream changes around them.
 
 ### 12b. Cross-reference with silent overwrite warnings
 
