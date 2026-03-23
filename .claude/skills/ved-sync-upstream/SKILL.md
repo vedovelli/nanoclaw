@@ -43,6 +43,20 @@ git branch --show-current
 
 **If not on `main`:** Ask the user to switch to `main` before proceeding.
 
+### Capture ved custom baseline (CRITICAL)
+
+Before any changes are made, capture a per-file snapshot of all `ved custom` markers. This baseline is used in step 12 to detect silently dropped customizations.
+
+```bash
+grep -rn "ved custom" src/ container/ scripts/ --include="*.ts" --include="Dockerfile" --include="*.sh" | grep -v "ved custom end" | awk -F: '{print $1}' | sort | uniq -c | sort -rn
+```
+
+Hold this output in your working context — you will compare against it in steps 6b and 12. Do not write it to a file. Record:
+- The total count of opening `ved custom` markers
+- The list of files and how many opening markers each file has
+
+This data is essential — without it, steps 6b and 12 cannot detect dropped customizations.
+
 ## 2. Fetch upstream
 
 Run the fetch script:
@@ -79,6 +93,19 @@ Present to the user:
 - If `customPatchesAtRisk` is non-empty: "These custom patches may need re-application: {list}"
 - If `filesDeleted` is non-empty: "{N} files will be removed"
 
+### Cross-reference with marker baseline (CRITICAL)
+
+Compare `filesChanged` from the preview against the marker baseline captured in step 1. Any file that:
+1. Has `ved custom` markers in the baseline, AND
+2. Appears in `filesChanged`, BUT
+3. Does NOT appear in `conflictRisk`
+
+...is a **silent overwrite risk**. The merge tool will replace it with the upstream version without triggering a conflict, silently dropping our customizations.
+
+**Flag these files to the user** with a warning: "These files have our customizations but the merge tool does not detect a conflict — they may be silently overwritten: {list}". These files will be verified immediately after the merge in step 6b.
+
+Also check `filesDeleted` against the marker baseline. Any file in `filesDeleted` that has markers in the baseline is a **guaranteed customization loss** — upstream is removing a file that contains our code. **Flag this as a blocker** and ask the user how to handle it (relocate the customization to another file, or keep our version of the file).
+
 ## 4. Confirm
 
 Use `AskUserQuestion`: "Create a sync branch and apply this update?" with options:
@@ -112,6 +139,26 @@ Parse the JSON output. The result has: `success`, `previousVersion`, `newVersion
 **If customPatchFailures exist:** Warn the user which custom patches failed to re-apply. These may need manual attention after the update.
 
 **If skillReapplyResults has false entries:** Warn the user which skill tests failed after re-application.
+
+## 6b. Protect flagged customizations (CRITICAL)
+
+**This step fires regardless of whether there are conflicts.** Immediately after step 6, check every file that was flagged as a "silent overwrite risk" in step 3:
+
+```bash
+grep -c "ved custom" <flagged-file>
+```
+
+For each flagged file, compare the marker count against the baseline from step 1:
+
+- **If the count matches the baseline:** The file survived the merge intact. Move on.
+- **If the count is 0 or lower than the baseline:** The file was silently overwritten. Restore the `ved custom` blocks immediately:
+
+  1. Extract the original version from main: `git show main:<file>`
+  2. Identify the `ved custom` blocks in the main version
+  3. Splice them back into the current (upstream) version at the correct locations
+  4. Write the restored file
+
+**Do not proceed to step 7 until every flagged file has been verified and restored if needed.** This is the proactive fix — step 12 is only the safety net.
 
 ## 7. Handle conflicts
 
@@ -213,29 +260,47 @@ Show the PR URL to the user.
 
 ## 12. Regression check
 
-After opening the PR, verify all `ved custom` markers survived the merge:
+This is the most important step. A silent overwrite can remove our customizations without any conflict or build error — the only way to catch it is explicit per-file verification.
+
+### 12a. Per-file marker comparison (CRITICAL — DO NOT SKIP)
+
+Capture the current per-file marker counts:
 
 ```bash
-grep -rn "ved custom" src/ container/ --include="*.ts" --include="Dockerfile" --include="*.sh"
+grep -rn "ved custom" src/ container/ scripts/ --include="*.ts" --include="Dockerfile" --include="*.sh" | grep -v "ved custom end" | awk -F: '{print $1}' | sort | uniq -c | sort -rn
 ```
 
-Each marker that existed before the sync must still be present. Count them: there should be **no fewer** than before. If any are missing, the block was dropped — restore it from the customizations tracker in Basic Memory Cloud (`nanoclaw/nano-claw-custom-modifications-tracker`).
+Compare this output **line by line** against the marker baseline captured in step 1:
 
-For the Dockerfile specifically, also verify ordering: `git safe.directory` must appear **after** `USER node`.
+1. Every file that had markers in the baseline **must still have the same number of markers** (or more, if new customizations were added during conflict resolution).
+2. If any file has **fewer markers** than the baseline, a customization was dropped — restore it.
+3. If any file from the baseline is **completely absent** from the current output, all its customizations were silently overwritten — this is the most dangerous case. Restore the `ved custom` blocks from `main` using `git show main:<file>`.
+
+**This per-file check is what prevents silent overwrites.** A global count can be misleading — a new marker in one file can mask a dropped marker in another.
+
+To identify which specific block was dropped, diff the current file against main: `git diff main -- <file>` and look for removed `ved custom` sections. Restore only the missing blocks, keeping the upstream changes around them.
+
+### 12b. Cross-reference with silent overwrite warnings
+
+If step 3 flagged any files as "silent overwrite risk" (files with markers that were in `filesChanged` but not in `conflictRisk`), verify each one individually now. Read the file and confirm the `ved custom` blocks are intact.
+
+### 12c. Structural checks
+
+For the Dockerfile specifically, verify ordering: `git safe.directory` must appear **after** `USER node`.
 
 ```bash
 grep -n "USER node\|safe.directory" container/Dockerfile
 ```
 
-Also verify custom skills are intact:
+Verify custom skills are intact:
 ```bash
 ls container/skills/
 ```
 `flare-monitor/`, `send-link/` and `competitor-monitor/` must be present.
 
-Also verify the X integration IPC handler is intact in `src/ipc.ts` (the `spawn` import and the `x_*` handler block in the `default` case) and the X MCP tools block is intact in `container/agent-runner/src/ipc-mcp-stdio.ts`. These are caught by the marker count check — the opening marker count should be **at least 12**.
+Verify the X integration IPC handler is intact in `src/ipc.ts` (the `spawn` import and the `x_*` handler block in the `default` case) and the X MCP tools block is intact in `container/agent-runner/src/ipc-mcp-stdio.ts`.
 
-Also verify that the `mcpServers` block in `container/agent-runner/src/index.ts` does not have duplicate keys. If upstream ever adds a `flare:` or `basic-memory-cloud:` entry outside our custom block, there would be two entries with the same key — a TypeScript error. Check:
+Verify that the `mcpServers` block in `container/agent-runner/src/index.ts` does not have duplicate keys:
 
 ```bash
 grep -c "flare:" container/agent-runner/src/index.ts
@@ -244,7 +309,9 @@ grep -c "'basic-memory-cloud':" container/agent-runner/src/index.ts
 
 Each must return exactly `1`. If either returns `2`, remove the upstream-added entry (outside the `ved custom` block) and keep ours.
 
-If anything is missing or misplaced, fix it, commit to the sync branch, and push before requesting review.
+### 12d. Fix and push
+
+If anything is missing or misplaced, fix it, commit to the sync branch, and push before requesting review. **Do not proceed to step 13 until every file passes the per-file check.**
 
 **When adding new customizations to upstream files in the future**, always wrap them with `/* ved custom */` ... `/* ved custom end */` (or `# ved custom` / `# ved custom end` in Dockerfile/shell), and update the customizations tracker.
 

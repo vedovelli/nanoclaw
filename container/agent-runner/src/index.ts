@@ -235,6 +235,7 @@ function createSanitizeBashHook(): HookCallback {
 }
 /* ved custom end */
 
+
 function sanitizeFilename(summary: string): string {
   return summary
     .toLowerCase()
