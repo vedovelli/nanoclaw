@@ -60,7 +60,6 @@ export function formatMessages(
   }
   /* ved custom end */
 
-
   return `${header}<messages>\n${lines.join('\n')}\n</messages>`;
 }
 
