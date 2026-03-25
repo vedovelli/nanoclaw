@@ -550,7 +550,7 @@ async function runQuery(
         },
         cogniscape: {
           type: 'http' as const,
-          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=5a6344b2327dd01d10411b7207f7f888cf319670bc836b92960630eb412058b7',
+          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=25ccc64084a748288c076149fc8eff8c1bc32c14dad64ed19a97a64f59fef7a5',
         },
         /* ved custom end */
       },
