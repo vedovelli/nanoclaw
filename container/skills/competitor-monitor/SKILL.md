@@ -1,13 +1,13 @@
 ---
 name: competitor-monitor
-description: Daily competitive intelligence monitor for Faros AI, Jellyfish, and Entelligence AI. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Basic Memory; sends an HTML report by email when changes are found; maintains a persistent timeline; creates GitHub issues for features relevant to Dev Visibility.
+description: Daily competitive intelligence monitor for Faros AI, Jellyfish, Entelligence AI, and Linear. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Basic Memory; sends an HTML report by email when changes are found; maintains a persistent timeline; creates GitHub issues for features relevant to Dev Visibility.
 ---
 
 # Competitor Monitor — Dev Visibility
 
 ## Notification Rules — Read Before Doing Anything
 
-**You may only call `mcp__gmail__*` to send an email when there are actual changes since yesterday for at least one competitor (Faros AI, Jellyfish, or Entelligence AI).**
+**You may only call `mcp__gmail__*` to send an email when there are actual changes since yesterday for at least one competitor (Faros AI, Jellyfish, Entelligence AI, or Linear).**
 
 In every other situation (no changes, errors, API failures), produce no output and call no tools except `<internal>`.
 
@@ -74,9 +74,10 @@ This skill does the following on every run:
 3. Researches Faros AI (GitHub API + browser)
 4. Researches Jellyfish (browser)
 5. Researches Entelligence AI (GitHub API + browser)
-6. Compares findings with yesterday's snapshot
-7. If no changes in any competitor → silent exit
-8. If changes found → generates HTML report → sends as HTML email body → updates timeline in Basic Memory → saves daily snapshots → creates GitHub issues for Dev Visibility-relevant features
+6. Researches Linear (GitHub API + browser)
+7. Compares findings with yesterday's snapshot
+8. If no changes in any competitor → silent exit
+9. If changes found → generates HTML report → sends as HTML email body → updates timeline in Basic Memory → saves daily snapshots → creates GitHub issues for Dev Visibility-relevant features
 
 ## Steps
 
@@ -94,11 +95,13 @@ Use `mcp__basic-memory-cloud__read_note` with `project: "dev-visibility-product"
 - `Concorrência/Faros AI/$YESTERDAY`
 - `Concorrência/Jellyfish/$YESTERDAY`
 - `Concorrência/Entelligence AI/$YESTERDAY`
+- `Concorrência/Linear/$YESTERDAY`
 
 If any note is not found (e.g. first run), fall back to the base analysis docs:
 - `Concorrência/Faros AI - Análise Competitiva`
 - `Concorrência/Jellyfish - Análise Competitiva`
 - `Concorrência/Entelligence AI - Análise Competitiva`
+- `Concorrência/Linear - Análise Competitiva`
 
 Also read `Concorrência/Monitoramento Diário - Perguntas de Análise` to understand which signals to look for.
 
@@ -117,7 +120,7 @@ If it does NOT exist, write it now before proceeding:
 
 This sentinel is written before any research begins, so re-runs triggered by container crashes or scheduler retries will not produce duplicate emails.
 
-Additionally, always read `Concorrência/Faros AI - Análise Competitiva`, `Concorrência/Jellyfish - Análise Competitiva`, and `Concorrência/Entelligence AI - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for all competitors. Store these for use in step 8 when applying the `high-threat` CSS class.
+Additionally, always read `Concorrência/Faros AI - Análise Competitiva`, `Concorrência/Jellyfish - Análise Competitiva`, `Concorrência/Entelligence AI - Análise Competitiva`, and `Concorrência/Linear - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for all competitors. Store these for use in step 8 when applying the `high-threat` CSS class.
 
 Also read these two product documents from Basic Memory (`project: "dev-visibility-product"`) to understand what Dev Visibility is building. You will use this context in steps 3–5 to identify competitor features worth turning into GitHub issues:
 
@@ -315,7 +318,81 @@ Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDI
 
 If both `crawlee-fetch` and `agent-browser` fail or return no usable content for any sub-step, treat that source as "no data" and continue. If ALL sources in this step fail, treat Entelligence AI as having no changes for today.
 
-### 6. Compare with yesterday
+### 6. Research Linear
+
+Linear is a project management and issue tracking platform for software teams (modern Jira alternative). They recently launched **Linear Agent** — an AI agent that understands a workspace's roadmap, issues, and code, and can autonomously triage, plan, and dispatch work to coding agents. They also offer deep integrations with AI coding tools (Claude Code, Cursor, GitHub Copilot) via deeplinks and MCP support. Linear competes with Dev Visibility on the AI-powered engineering intelligence and orchestration layer.
+
+**a) GitHub repos (linear org, non-fork only):**
+
+```bash
+gh api orgs/linear/repos -f per_page=30 --jq '[.[] | select(.fork == false) | {name: .full_name, pushed: .pushed_at, description: .description}]'
+```
+
+Check for any repos pushed since $YESTERDAY. For repos with recent activity, check releases:
+
+```bash
+gh api repos/linear/linear/releases \
+  -f per_page=5 \
+  --jq '[.[] | select(.published_at >= "'$YESTERDAY'") | {tag: .tag_name, published: .published_at, body: .body}]'
+```
+
+Also check if any new non-fork repos appeared since yesterday's snapshot.
+
+**b) Blog — new posts:**
+
+**Step 1 — curl pre-flight (mandatory):**
+```bash
+curl -sI -L --max-redirs 5 "https://linear.app/blog" 2>&1 | grep -iE "^(HTTP/|location:)"
+```
+- If curl shows `200` with no `Location:` → proceed to step 2.
+- If curl shows `Location:` redirect → record the redirect chain as a finding. Do NOT use browser.
+- If curl fails → skip. No data.
+
+**Step 2 — content extraction (only if curl shows 200, no redirect):**
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://linear.app/blog`. Extract post titles, dates, and URLs. **Only include posts with a publish date of $TODAY or $YESTERDAY.** Discard any post older than $YESTERDAY.
+
+**c) Changelog — recent updates:**
+
+**Step 1 — curl pre-flight (mandatory):**
+```bash
+curl -sI -L --max-redirs 5 "https://linear.app/changelog" 2>&1 | grep -iE "^(HTTP/|location:)"
+```
+- If curl shows `200` with no `Location:` → proceed to step 2.
+- If curl shows redirect or fails → skip. No data.
+
+**Step 2 — content extraction (only if curl shows 200, no redirect):**
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://linear.app/changelog`. Note any new entries compared to yesterday's snapshot. Pay particular attention to:
+- Linear Agent updates (new capabilities, expanded access)
+- MCP integration changes
+- New coding agent integrations (Claude Code, Cursor, Copilot, Codex)
+- Triage automation features
+- API or SDK changes
+
+**d) Product / Agent page:**
+
+**Step 1 — curl pre-flight (mandatory):**
+```bash
+curl -sI -L --max-redirs 5 "https://linear.app/features" 2>&1 | grep -iE "^(HTTP/|location:)"
+```
+- If curl shows `200` with no `Location:` → proceed to step 2.
+- If curl shows redirect or fails → skip. No data.
+
+**Step 2 — content extraction (only if curl shows 200, no redirect):**
+Use `crawlee-fetch` (with `agent-browser` as fallback) to fetch `https://linear.app/features`. Note any changes in positioning, feature highlights, new AI capabilities, or announcements compared to yesterday's snapshot.
+
+**e) Tag Dev Visibility candidates:**
+
+Apply the same tagging logic as step 3f: mark any item as `[DEV_VISIBILITY_CANDIDATE]` if it aligns with PRD capabilities or reduces Dev Visibility's differentiation. Linear overlaps heavily with Dev Visibility in these areas:
+- AI agent orchestration and autonomous task management
+- MCP integration for AI coding tools
+- Deeplink integration with Claude Code, Cursor, GitHub Copilot
+- Triage automation and intelligent issue routing
+- Engineering workflow intelligence and project analytics
+- Context-aware AI that understands codebase + project state
+
+If both `crawlee-fetch` and `agent-browser` fail or return no usable content for any sub-step, treat that source as "no data" and continue. If ALL sources in this step fail, treat Linear as having no changes for today.
+
+### 7. Compare with yesterday
 
 **MANDATORY VERIFICATION GATE — you MUST complete this before listing ANY changes:**
 
@@ -353,18 +430,19 @@ Produce a structured findings list for each competitor:
 FAROS_CHANGES = [list of new items not in yesterday's snapshot]
 JELLYFISH_CHANGES = [list of new items not in yesterday's snapshot]
 ENTELLIGENCE_CHANGES = [list of new items not in yesterday's snapshot]
+LINEAR_CHANGES = [list of new items not in yesterday's snapshot]
 ```
 
-### 7. Decide: send or silent exit
+### 8. Decide: send or silent exit
 
-If `FAROS_CHANGES`, `JELLYFISH_CHANGES`, and `ENTELLIGENCE_CHANGES` are all empty → exit:
+If `FAROS_CHANGES`, `JELLYFISH_CHANGES`, `ENTELLIGENCE_CHANGES`, and `LINEAR_CHANGES` are all empty → exit:
 ```
 <internal>Nothing to do this run.</internal>
 ```
 
 **Critical:** The `<` must be the very first character of your entire output. Do NOT write any summary, reasoning, or explanation before the `<internal>` tag.
 
-### 8. Generate HTML report
+### 9. Generate HTML report
 
 **Ação Necessária decision rule:**
 - If any change item matches a "Sinais de Alerta" entry (i.e. has `high-threat` class) → write **alertar founder**
@@ -405,6 +483,9 @@ Write to `/tmp/competitor-report-$TODAY.html`. Use clean, readable HTML with inl
   <h2>Entelligence AI</h2>
   <!-- Same structure -->
 
+  <h2>Linear</h2>
+  <!-- Same structure -->
+
   <h2>Relevância para Dev Visibility</h2>
   <p>[Analysis: do any of these changes reduce our differentiation? Did threat level change?]</p>
 
@@ -425,17 +506,17 @@ Write to `/tmp/competitor-report-$TODAY.html`. Use clean, readable HTML with inl
 
 Use `high-threat` CSS class on items that match the "Sinais de Alerta" sections from the base analysis documents.
 
-### 9. Send HTML report by email
+### 10. Send HTML report by email
 
 Read the content of `/tmp/competitor-report-$TODAY.html` and send it as the email body:
 
 - **To:** fabio@vedovelli.com.br
 - **Subject:** `[Dev Visibility] Competitive Intelligence — $TODAY`
-- **Body:** Full HTML content of the report (the file generated in step 7)
+- **Body:** Full HTML content of the report (the file generated in step 9)
 - **mimeType:** `text/html`
 - **No attachments**
 
-### 10. Update Timeline in Basic Memory
+### 11. Update Timeline in Basic Memory
 
 Regardless of whether the email succeeded, update the persistent timeline document in `dev-visibility-product`.
 
@@ -479,9 +560,9 @@ Histórico cronológico de features, parcerias e movimentos estratégicos detect
 
 If the timeline update fails for any reason, continue silently — do not abort.
 
-> **If the Gmail send in step 9 failed:** continue to steps 10–12 anyway — the timeline and snapshots should still be saved. Only the email notification is skipped.
+> **If the Gmail send in step 10 failed:** continue to steps 11–13 anyway — the timeline and snapshots should still be saved. Only the email notification is skipped.
 
-### 11. Save today's snapshots to Basic Memory
+### 12. Save today's snapshots to Basic Memory
 
 Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product"` for each competitor:
 
@@ -545,9 +626,33 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 [Any banners, press releases, or notable homepage content]
 ```
 
-### 12. Create GitHub issues for Dev Visibility-relevant features
+**Title:** `$TODAY`
+**Directory:** `Concorrência/Linear`
+**Content:** Use this exact Markdown schema (omit sections with no data):
 
-For each item marked `[DEV_VISIBILITY_CANDIDATE]` in steps 3, 4, and 5:
+```markdown
+## GitHub Repos
+- [repo] — [last pushed] — [description or notable changes]
+
+## Releases
+- [repo] [tag] — [published_at] — [key changes summary]
+
+## Blog Posts
+- [title] — [date] — [url]
+
+## Changelog
+[New entries from linear.app/changelog — feature updates, agent capabilities, MCP changes]
+
+## Product Page
+[Notable copy, positioning changes, new AI capabilities, or feature highlights]
+
+## Announcements
+[Any banners, press releases, or notable homepage content]
+```
+
+### 13. Create GitHub issues for Dev Visibility-relevant features
+
+For each item marked `[DEV_VISIBILITY_CANDIDATE]` in steps 3, 4, 5, and 6:
 
 **a)** Check for duplicate issues to avoid noise:
 

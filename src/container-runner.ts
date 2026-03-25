@@ -249,6 +249,16 @@ function buildVolumeMounts(
       readonly: false,
     });
   }
+
+  // Host Documents folder (read-write so the agent can read/create files)
+  const documentsDir = path.join(homeDir, 'Documents');
+  if (fs.existsSync(documentsDir)) {
+    mounts.push({
+      hostPath: documentsDir,
+      containerPath: '/home/node/Documents',
+      readonly: false,
+    });
+  }
   /* ved custom end */
 
   // Per-group IPC namespace: each group gets its own IPC directory
