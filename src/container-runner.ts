@@ -353,6 +353,7 @@ function buildContainerArgs(
   }
   // Obsidian runs on the host — inside the container, localhost won't work;
   // override to host.docker.internal so the container can reach the host API.
+  // TODO: verify host.docker.internal works with Apple Container runtime
   args.push('-e', 'OBSIDIAN_HOST=host.docker.internal');
   /* ved custom end */
 

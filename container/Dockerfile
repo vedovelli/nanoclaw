@@ -46,7 +46,9 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 
 # ved custom
 # Install uv (Python package manager) for stdio MCP servers (e.g. mcp-obsidian)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
+# Pre-install mcp-obsidian to avoid cold-start download latency (same pattern as npm MCP servers below)
+RUN uv tool install mcp-obsidian
 # ved custom end
 
 # Install agent-browser, claude-code, and MCP servers globally
