@@ -172,10 +172,9 @@ grep -n "ved custom" <file>
 
 Any code between `/* ved custom */` and `/* ved custom end */` (or `# ved custom` / `# ved custom end` in Dockerfile/shell) is a local customization — **always keep our side for those blocks**.
 
-**When still uncertain about what a local change is doing or why it exists**, consult the customizations tracking document in Basic Memory Cloud:
-- Project: `nanoclaw`
-- Permalink: `nanoclaw/nano-claw-custom-modifications-tracker`
-- Fetch it with: `mcp__basic-memory-cloud__read_note` (identifier: `nanoclaw/nano-claw-custom-modifications-tracker`, project: `nanoclaw`)
+**When still uncertain about what a local change is doing or why it exists**, consult the customizations tracking document in Obsidian:
+- Vault path: `nanoclaw/nano-claw-custom-modifications-tracker.md`
+- Fetch it with: `mcp__mcp-obsidian__obsidian_get_file_contents` (filepath: `nanoclaw/nano-claw-custom-modifications-tracker.md`)
 
 It lists every active customization, which files are affected, and re-apply difficulty. **Always keep our side** for any customization listed there.
 
@@ -304,7 +303,7 @@ Verify that the `mcpServers` block in `container/agent-runner/src/index.ts` does
 
 ```bash
 grep -c "flare:" container/agent-runner/src/index.ts
-grep -c "'basic-memory-cloud':" container/agent-runner/src/index.ts
+grep -c "'mcp-obsidian':" container/agent-runner/src/index.ts
 ```
 
 Each must return exactly `1`. If either returns `2`, remove the upstream-added entry (outside the `ved custom` block) and keep ours.
@@ -332,12 +331,9 @@ Report final status:
 
 **Write this note immediately after cleanup** — do not wait for the PR to be merged.
 
-Use `mcp__basic-memory-cloud__write_note` to write the report:
+Use `mcp__mcp-obsidian__obsidian_patch_content` to write the report to the Obsidian vault:
 
-- Project: `nanoclaw`
-- Directory: `reports`
-- Title: `Upstream Sync v<NEW_VERSION> — Session Report (YYYY-MM-DD)`
-- Tags: `upstream-sync`, `v<NEW_VERSION>`, `session-report`
+- Filepath: `nanoclaw/reports/Upstream Sync v<NEW_VERSION> — Session Report (YYYY-MM-DD).md`
 
 The report **must** cover all of the following sections:
 

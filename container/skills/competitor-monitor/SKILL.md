@@ -1,6 +1,6 @@
 ---
 name: competitor-monitor
-description: Daily competitive intelligence monitor for Faros AI, Jellyfish, Entelligence AI, and Linear. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Basic Memory; sends an HTML report by email when changes are found; maintains a persistent timeline; creates GitHub issues for features relevant to Dev Visibility.
+description: Daily competitive intelligence monitor for Faros AI, Jellyfish, Entelligence AI, and Linear. Fetches updates from GitHub, blogs, and product pages; compares with yesterday's snapshot in Obsidian; sends an HTML report by email when changes are found; maintains a persistent timeline; creates GitHub issues for features relevant to Dev Visibility.
 ---
 
 # Competitor Monitor — Dev Visibility
@@ -70,14 +70,14 @@ Then follow this decision tree:
 This skill does the following on every run:
 
 1. Calculates today's and yesterday's dates
-2. Reads yesterday's snapshots from Basic Memory
+2. Reads yesterday's snapshots from Obsidian
 3. Researches Faros AI (GitHub API + browser)
 4. Researches Jellyfish (browser)
 5. Researches Entelligence AI (GitHub API + browser)
 6. Researches Linear (GitHub API + browser)
 7. Compares findings with yesterday's snapshot
 8. If no changes in any competitor → silent exit
-9. If changes found → generates HTML report → sends as HTML email body → updates timeline in Basic Memory → saves daily snapshots → creates GitHub issues for Dev Visibility-relevant features
+9. If changes found → generates HTML report → sends as HTML email body → updates timeline in Obsidian → saves daily snapshots → creates GitHub issues for Dev Visibility-relevant features
 
 ## Steps
 
@@ -89,43 +89,42 @@ YESTERDAY=$(date -d "yesterday" +%Y-%m-%d 2>/dev/null || date -v-1d +%Y-%m-%d)
 echo "Today: $TODAY | Yesterday: $YESTERDAY"
 ```
 
-### 2. Read yesterday's snapshots from Basic Memory
+### 2. Read yesterday's snapshots from Obsidian
 
-Use `mcp__basic-memory-cloud__read_note` with `project: "dev-visibility-product"` for:
-- `Concorrência/Faros AI/$YESTERDAY`
-- `Concorrência/Jellyfish/$YESTERDAY`
-- `Concorrência/Entelligence AI/$YESTERDAY`
-- `Concorrência/Linear/$YESTERDAY`
+Use `mcp__mcp-obsidian__obsidian_get_file_contents` for:
+- `dev-visibility-product/Concorrência/Faros AI/$YESTERDAY.md`
+- `dev-visibility-product/Concorrência/Jellyfish/$YESTERDAY.md`
+- `dev-visibility-product/Concorrência/Entelligence AI/$YESTERDAY.md`
+- `dev-visibility-product/Concorrência/Linear/$YESTERDAY.md`
 
 If any note is not found (e.g. first run), fall back to the base analysis docs:
-- `Concorrência/Faros AI - Análise Competitiva`
-- `Concorrência/Jellyfish - Análise Competitiva`
-- `Concorrência/Entelligence AI - Análise Competitiva`
-- `Concorrência/Linear - Análise Competitiva`
+- `dev-visibility-product/Concorrência/Faros AI - Análise Competitiva.md`
+- `dev-visibility-product/Concorrência/Jellyfish - Análise Competitiva.md`
+- `dev-visibility-product/Concorrência/Entelligence AI - Análise Competitiva.md`
+- `dev-visibility-product/Concorrência/Linear - Análise Competitiva.md`
 
-Also read `Concorrência/Monitoramento Diário - Perguntas de Análise` to understand which signals to look for.
+Also read `dev-visibility-product/Concorrência/Monitoramento Diário - Perguntas de Análise.md` to understand which signals to look for.
 
 Store the content of all snapshots in memory for comparison in step 6.
 
-Also check whether `Concorrência/Run/$TODAY` already exists in Basic Memory (`project: "dev-visibility-product"`).
+Also check whether `dev-visibility-product/Concorrência/Run/$TODAY.md` already exists in Obsidian using `mcp__mcp-obsidian__obsidian_get_file_contents`.
 If it does, today's run already completed. Exit silently:
 ```
 <internal>Already ran today.</internal>
 ```
 
-If it does NOT exist, write it now before proceeding:
-- **Title:** `$TODAY`
-- **Directory:** `Concorrência/Run`
+If it does NOT exist, write it now before proceeding using `mcp__mcp-obsidian__obsidian_patch_content`:
+- **Filepath:** `dev-visibility-product/Concorrência/Run/$TODAY.md`
 - **Content:** `Run started at $TODAY.`
 
 This sentinel is written before any research begins, so re-runs triggered by container crashes or scheduler retries will not produce duplicate emails.
 
-Additionally, always read `Concorrência/Faros AI - Análise Competitiva`, `Concorrência/Jellyfish - Análise Competitiva`, `Concorrência/Entelligence AI - Análise Competitiva`, and `Concorrência/Linear - Análise Competitiva` to retrieve the **Sinais de Alerta** sections for all competitors. Store these for use in step 8 when applying the `high-threat` CSS class.
+Additionally, always read `dev-visibility-product/Concorrência/Faros AI - Análise Competitiva.md`, `dev-visibility-product/Concorrência/Jellyfish - Análise Competitiva.md`, `dev-visibility-product/Concorrência/Entelligence AI - Análise Competitiva.md`, and `dev-visibility-product/Concorrência/Linear - Análise Competitiva.md` to retrieve the **Sinais de Alerta** sections for all competitors. Store these for use in step 8 when applying the `high-threat` CSS class.
 
-Also read these two product documents from Basic Memory (`project: "dev-visibility-product"`) to understand what Dev Visibility is building. You will use this context in steps 3–5 to identify competitor features worth turning into GitHub issues:
+Also read these two product documents from Obsidian to understand what Dev Visibility is building. You will use this context in steps 3–5 to identify competitor features worth turning into GitHub issues:
 
-- `design/PRD - PoC Single-User v1.0` (primary — what we're building now)
-- `design/PRD - MVP Enterprise-Ready` (secondary — future direction)
+- `dev-visibility-product/design/PRD - PoC Single-User v1.0.md` (primary — what we're building now)
+- `dev-visibility-product/design/PRD - MVP Enterprise-Ready.md` (secondary — future direction)
 
 Store the key capabilities and differentiators from both PRDs in memory.
 
@@ -418,7 +417,7 @@ curl: [paste actual output]
 
 **C) If all findings are deleted after step B, proceed to step 7 (silent exit).**
 
-For each competitor, answer these questions using the monitoring questions from Basic Memory and what you found:
+For each competitor, answer these questions using the monitoring questions from Obsidian and what you found:
 
 - Is there a new blog post? What's the topic?
 - Is there a new release or PR that touches AI coding tool integrations?
@@ -516,11 +515,11 @@ Read the content of `/tmp/competitor-report-$TODAY.html` and send it as the emai
 - **mimeType:** `text/html`
 - **No attachments**
 
-### 11. Update Timeline in Basic Memory
+### 11. Update Timeline in Obsidian
 
-Regardless of whether the email succeeded, update the persistent timeline document in `dev-visibility-product`.
+Regardless of whether the email succeeded, update the persistent timeline document in the Obsidian vault.
 
-**a)** Check if `Concorrência/Timeline de Melhorias` exists using `mcp__basic-memory-cloud__read_note`.
+**a)** Check if `dev-visibility-product/Concorrência/Timeline de Melhorias.md` exists using `mcp__mcp-obsidian__obsidian_get_file_contents`.
 
 **b)** Prepare today's timeline entry using this structure:
 
@@ -540,12 +539,10 @@ Classification rules:
 - **🟡 MÉDIO** — relevant but not critical (strategic messaging, notable blog post)
 - **⚪ BAIXO** — informational (generic content, minor release)
 
-**c)** If the timeline document exists: use `mcp__basic-memory-cloud__edit_note` with `operation: "prepend"` to add today's entry at the top.
+**c)** If the timeline document exists: use `mcp__mcp-obsidian__obsidian_patch_content` to prepend today's entry at the top (insert after the frontmatter/header).
 
-**d)** If it does NOT exist: create it with `mcp__basic-memory-cloud__write_note`:
-- **Title:** `Timeline de Melhorias`
-- **Directory:** `Concorrência`
-- **project:** `dev-visibility-product`
+**d)** If it does NOT exist: create it with `mcp__mcp-obsidian__obsidian_patch_content`:
+- **Filepath:** `dev-visibility-product/Concorrência/Timeline de Melhorias.md`
 - **Content:** Header + today's entry:
 
 ```markdown
@@ -562,12 +559,11 @@ If the timeline update fails for any reason, continue silently — do not abort.
 
 > **If the Gmail send in step 10 failed:** continue to steps 11–13 anyway — the timeline and snapshots should still be saved. Only the email notification is skipped.
 
-### 12. Save today's snapshots to Basic Memory
+### 12. Save today's snapshots to Obsidian
 
-Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product"` for each competitor:
+Use `mcp__mcp-obsidian__obsidian_patch_content` for each competitor:
 
-**Title:** `$TODAY`
-**Directory:** `Concorrência/Faros AI`
+**Filepath:** `dev-visibility-product/Concorrência/Faros AI/$TODAY.md`
 **Content:** Use this exact Markdown schema (omit sections with no data):
 
 ```markdown
@@ -587,8 +583,7 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 [Any banners, press releases, or notable homepage content]
 ```
 
-**Title:** `$TODAY`
-**Directory:** `Concorrência/Jellyfish`
+**Filepath:** `dev-visibility-product/Concorrência/Jellyfish/$TODAY.md`
 **Content:** Use this exact Markdown schema (omit sections with no data):
 
 ```markdown
@@ -602,8 +597,7 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 [Any banners, press releases, or notable homepage content]
 ```
 
-**Title:** `$TODAY`
-**Directory:** `Concorrência/Entelligence AI`
+**Filepath:** `dev-visibility-product/Concorrência/Entelligence AI/$TODAY.md`
 **Content:** Use this exact Markdown schema (omit sections with no data):
 
 ```markdown
@@ -626,8 +620,7 @@ Use `mcp__basic-memory-cloud__write_note` with `project: "dev-visibility-product
 [Any banners, press releases, or notable homepage content]
 ```
 
-**Title:** `$TODAY`
-**Directory:** `Concorrência/Linear`
+**Filepath:** `dev-visibility-product/Concorrência/Linear/$TODAY.md`
 **Content:** Use this exact Markdown schema (omit sections with no data):
 
 ```markdown

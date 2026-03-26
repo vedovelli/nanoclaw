@@ -503,7 +503,7 @@ async function runQuery(
         'mcp__gmail__*',
         'mcp__calendar__*',
         'mcp__flare__*',
-        'mcp__basic-memory-cloud__*',
+        'mcp__mcp-obsidian__*',
         'mcp__cogniscape__*',
         /* ved custom end */
       ],
@@ -543,10 +543,14 @@ async function runQuery(
           url: 'https://flareapp.io/mcp',
           headers: { Authorization: `Bearer ${sdkEnv.FLARE_API_TOKEN || ''}` },
         },
-        'basic-memory-cloud': {
-          type: 'http' as const,
-          url: 'https://cloud.basicmemory.com/mcp',
-          headers: { Authorization: `Bearer ${sdkEnv.BASIC_MEMORY_API_KEY || ''}` },
+        'mcp-obsidian': {
+          command: 'uvx',
+          args: ['mcp-obsidian'],
+          env: {
+            OBSIDIAN_API_KEY: sdkEnv.OBSIDIAN_API_KEY || '',
+            OBSIDIAN_HOST: sdkEnv.OBSIDIAN_HOST || 'host.docker.internal',
+            OBSIDIAN_PORT: sdkEnv.OBSIDIAN_PORT || '27124',
+          },
         },
         cogniscape: {
           type: 'http' as const,
