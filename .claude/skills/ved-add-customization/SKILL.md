@@ -48,9 +48,8 @@ If the earliest commit is an upstream sync (message contains "Sync upstream" or 
 
 Before touching anything, read the existing customizations tracker:
 
-- Project: `nanoclaw`
-- Permalink: `nanoclaw/nano-claw-custom-modifications-tracker`
-- Tool: `mcp__basic-memory-cloud__read_note` (identifier: `nanoclaw/nano-claw-custom-modifications-tracker`, project: `nanoclaw`)
+- Vault path: `nanoclaw/nano-claw-custom-modifications-tracker.md`
+- Tool: `mcp__mcp-obsidian__obsidian_get_file_contents` (filepath: `nanoclaw/nano-claw-custom-modifications-tracker.md`)
 
 Understand what's already customized in the target files. Do not duplicate or conflict with existing marked blocks.
 
@@ -93,7 +92,7 @@ O tracker tem **dois níveis**: a nota principal é uma tabela de alto nível; o
 
 ### 5a — Adicionar linha ao tracker principal
 
-Editar a tabela em `nanoclaw/nano-claw-custom-modifications-tracker` (project: `nanoclaw`) com `mcp__basic-memory-cloud__edit_note` (operation: `find_replace`).
+Editar a tabela em `nanoclaw/nano-claw-custom-modifications-tracker.md` no vault Obsidian com `mcp__mcp-obsidian__obsidian_patch_content`.
 
 Adicionar uma linha na tabela "Active Customizations" com:
 
@@ -105,10 +104,8 @@ Campos obrigatórios: número sequencial, nome linkado à nota individual, PR ou
 
 ### 5b — Criar nota individual de detalhes
 
-Criar uma nova nota em `nanoclaw/customizations/` com `mcp__basic-memory-cloud__write_note`:
-- **title:** `NN — Nome da Customização`
-- **directory:** `nanoclaw/customizations`
-- **project:** `nanoclaw`
+Criar uma nova nota no vault Obsidian com `mcp__mcp-obsidian__obsidian_patch_content`:
+- **filepath:** `nanoclaw/customizations/NN — Nome da Customização.md`
 
 Conteúdo mínimo da nota:
 

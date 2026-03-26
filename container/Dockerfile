@@ -44,6 +44,11 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     && rm -rf /var/lib/apt/lists/*
 # ved custom end
 
+# ved custom
+# Install uv (Python package manager) for stdio MCP servers (e.g. mcp-obsidian)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# ved custom end
+
 # Install agent-browser, claude-code, and MCP servers globally
 # Pre-installing MCP servers avoids ~20-30s npx download on every cold start
 # ved custom: gmail, calendar, mcp-remote added below

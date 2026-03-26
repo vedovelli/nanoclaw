@@ -345,11 +345,15 @@ function buildContainerArgs(
   const mcpSecrets = readEnvFile([
     'GITHUB_PERSONAL_ACCESS_TOKEN',
     'FLARE_API_TOKEN',
-    'BASIC_MEMORY_API_KEY',
+    'OBSIDIAN_API_KEY',
+    'OBSIDIAN_PORT',
   ]);
   for (const [key, value] of Object.entries(mcpSecrets)) {
     if (value) args.push('-e', `${key}=${value}`);
   }
+  // Obsidian runs on the host — inside the container, localhost won't work;
+  // override to host.docker.internal so the container can reach the host API.
+  args.push('-e', 'OBSIDIAN_HOST=host.docker.internal');
   /* ved custom end */
 
 
