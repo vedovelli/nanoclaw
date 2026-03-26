@@ -47,8 +47,6 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 # ved custom
 # Install uv (Python package manager) for stdio MCP servers (e.g. mcp-obsidian)
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
-# Pre-install mcp-obsidian to avoid cold-start download latency (same pattern as npm MCP servers below)
-RUN uv tool install mcp-obsidian
 # ved custom end
 
 # Install agent-browser, claude-code, and MCP servers globally
@@ -95,6 +93,8 @@ USER node
 # when the host directory is owned by a different UID than the container user)
 # Must run after USER node so it writes to /home/node/.gitconfig, not /root/.gitconfig
 RUN git config --global --add safe.directory '*'
+# Pre-install mcp-obsidian as node user to avoid cold-start download latency
+RUN uv tool install mcp-obsidian
 # ved custom end
 
 # Set working directory to group workspace

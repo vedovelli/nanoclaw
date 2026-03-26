@@ -544,8 +544,8 @@ async function runQuery(
           headers: { Authorization: `Bearer ${sdkEnv.FLARE_API_TOKEN || ''}` },
         },
         'mcp-obsidian': {
-          command: 'uvx',
-          args: ['mcp-obsidian'],
+          command: 'uv',
+          args: ['tool', 'run', 'mcp-obsidian'],
           env: {
             OBSIDIAN_API_KEY: sdkEnv.OBSIDIAN_API_KEY || '',
             OBSIDIAN_HOST: sdkEnv.OBSIDIAN_HOST || 'host.docker.internal',
