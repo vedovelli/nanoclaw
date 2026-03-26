@@ -94,7 +94,11 @@ USER node
 # Must run after USER node so it writes to /home/node/.gitconfig, not /root/.gitconfig
 RUN git config --global --add safe.directory '*'
 # Pre-install mcp-obsidian as node user to avoid cold-start download latency
-RUN uv tool install mcp-obsidian
+# Patch: mcp-obsidian hardcodes host=127.0.0.1 — inject OBSIDIAN_HOST/PORT env var support
+# so the container can reach the host Obsidian API via host.docker.internal
+RUN uv tool install mcp-obsidian \
+    && TOOLS_PY=$(find /home/node/.local -path '*/mcp_obsidian/tools.py' -print -quit) \
+    && sed -i 's/obsidian.Obsidian(api_key=api_key)/obsidian.Obsidian(api_key=api_key, host=os.getenv("OBSIDIAN_HOST", "127.0.0.1"), port=int(os.getenv("OBSIDIAN_PORT", "27124")))/g' "$TOOLS_PY"
 # ved custom end
 
 # Set working directory to group workspace
