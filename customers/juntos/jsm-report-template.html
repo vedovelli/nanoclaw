@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório Diário de Engenharia – Juntos Somos Mais</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --jsm-dark:    #1A1A2A;
+      --jsm-blue:    #1B4FA8;
+      --jsm-blue-light: #2D6ED4;
+      --jsm-orange:  #F47A1F;
+      --jsm-cyan:    #29ABE2;
+      --jsm-green:   #39B54A;
+      --jsm-red:     #ED1C24;
+      --jsm-gray:    #6B7280;
+      --jsm-bg:      #F4F6FB;
+      --jsm-card:    #FFFFFF;
+      --jsm-border:  #E5E9F2;
+      --jsm-text:    #1A1A2A;
+      --jsm-text-muted: #6B7280;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--jsm-bg);
+      color: var(--jsm-text);
+      min-height: 100vh;
+    }
+
+    .wrapper {
+      max-width: 860px;
+      margin: 0 auto;
+      background: var(--jsm-bg);
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--jsm-dark);
+      padding: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 36px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* JSM logo recreated in SVG */
+    .logo-svg { width: 48px; height: 48px; flex-shrink: 0; }
+
+    .logo-text {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+    }
+    .logo-text .juntos { color: #fff; font-size: 16px; letter-spacing: 1px; display: block; }
+    .logo-text .somos  { color: var(--jsm-orange); font-size: 16px; letter-spacing: 1px; display: block; }
+
+    .header-meta {
+      text-align: right;
+    }
+    .header-meta .report-label {
+      color: rgba(255,255,255,0.5);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: block;
+    }
+    .header-meta .report-date {
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      display: block;
+      margin-top: 2px;
+    }
+
+    .header-hero {
+      padding: 32px 36px 36px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .header-hero::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -40px;
+      width: 320px; height: 320px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255,255,255,0.08);
+      pointer-events: none;
+    }
+    .header-hero::after {
+      content: '';
+      position: absolute;
+      top: -20px; right: 80px;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255,255,255,0.05);
+      pointer-events: none;
+    }
+
+    .header-title h1 {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 26px;
+      color: #fff;
+      line-height: 1.2;
+    }
+    .header-title h1 span { color: var(--jsm-orange); }
+    .header-title p {
+      color: rgba(255,255,255,0.55);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .header-period {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 160px;
+    }
+    .header-period .period-label {
+      color: rgba(255,255,255,0.4);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .header-period .period-value {
+      color: var(--jsm-cyan);
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ── ORANGE STRIPE ── */
+    .stripe {
+      height: 4px;
+      background: linear-gradient(90deg, var(--jsm-orange) 0%, var(--jsm-cyan) 50%, var(--jsm-green) 100%);
+    }
+
+    /* ── SECTION TITLES ── */
+    .section {
+      padding: 28px 36px 0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .section-title .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .section-title h2 {
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--jsm-blue);
+    }
+    .section-title .line {
+      flex: 1;
+      height: 1px;
+      background: var(--jsm-border);
+    }
+
+    /* ── KPI CARDS ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .kpi-card {
+      background: var(--jsm-card);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--jsm-border);
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .kpi-card.blue::after  { background: var(--jsm-blue); }
+    .kpi-card.orange::after { background: var(--jsm-orange); }
+    .kpi-card.green::after  { background: var(--jsm-green); }
+    .kpi-card.cyan::after   { background: var(--jsm-cyan); }
+
+    .kpi-icon {
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+    .kpi-value {
+      font-family: 'Nunito', sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--jsm-text);
+      line-height: 1;
+    }
+    .kpi-label {
+      font-size: 11px;
+      color: var(--jsm-text-muted);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+    .kpi-delta {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+    .kpi-delta.up   { color: var(--jsm-green); background: rgba(57,181,74,0.1); }
+    .kpi-delta.down { color: var(--jsm-red);   background: rgba(237,28,36,0.1); }
+    .kpi-delta.neutral { color: var(--jsm-gray); background: rgba(107,114,128,0.1); }
+
+    /* ── DEVELOPER TABLE ── */
+    .dev-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--jsm-card);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--jsm-border);
+    }
+    .dev-table thead tr {
+      background: var(--jsm-blue);
+    }
+    .dev-table thead th {
+      color: rgba(255,255,255,0.9);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 11px 14px;
+      text-align: left;
+    }
+    .dev-table tbody tr {
+      border-bottom: 1px solid var(--jsm-border);
+      transition: background 0.15s;
+    }
+    .dev-table tbody tr:last-child { border-bottom: none; }
+    .dev-table tbody tr:hover { background: #F0F4FF; }
+    .dev-table tbody td {
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+
+    .dev-avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    .dev-name {
+      font-weight: 600;
+      vertical-align: middle;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-blue   { background: rgba(27,79,168,0.12); color: var(--jsm-blue); }
+    .badge-orange { background: rgba(244,122,31,0.12); color: var(--jsm-orange); }
+    .badge-green  { background: rgba(57,181,74,0.12);  color: var(--jsm-green); }
+    .badge-cyan   { background: rgba(41,171,226,0.12); color: #1490C0; }
+    .badge-red    { background: rgba(237,28,36,0.12);  color: var(--jsm-red); }
+
+    .activity-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .activity-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--jsm-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .activity-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--jsm-blue);
+    }
+    .activity-num {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--jsm-text-muted);
+      min-width: 24px;
+      text-align: right;
+    }
+
+    /* ── PR / ISSUE CARDS ── */
+    .card-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .pr-card {
+      background: var(--jsm-card);
+      border: 1px solid var(--jsm-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .pr-icon {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .pr-icon.merged  { background: rgba(130,80,255,0.12); }
+    .pr-icon.open    { background: rgba(57,181,74,0.12); }
+    .pr-icon.review  { background: rgba(244,122,31,0.12); }
+    .pr-icon.issue   { background: rgba(27,79,168,0.12); }
+
+    .pr-body { flex: 1; min-width: 0; }
+    .pr-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--jsm-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pr-meta {
+      font-size: 11px;
+      color: var(--jsm-text-muted);
+      margin-top: 3px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .pr-repo {
+      font-weight: 500;
+      color: var(--jsm-blue);
+    }
+
+    /* ── ROI / COST ── */
+    .roi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .roi-card {
+      background: var(--jsm-card);
+      border: 1px solid var(--jsm-border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .roi-card .roi-title {
+      font-size: 11px;
+      color: var(--jsm-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+    .roi-card .roi-val {
+      font-family: 'Nunito', sans-serif;
+      font-size: 30px;
+      font-weight: 900;
+      color: var(--jsm-blue);
+      margin-top: 4px;
+    }
+    .roi-card .roi-sub {
+      font-size: 11px;
+      color: var(--jsm-text-muted);
+      margin-top: 4px;
+    }
+
+    .token-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .token-table td {
+      padding: 5px 0;
+      font-size: 12px;
+    }
+    .token-table td:last-child { text-align: right; font-weight: 600; }
+    .token-table tr { border-bottom: 1px solid var(--jsm-border); }
+    .token-table tr:last-child { border-bottom: none; }
+
+    /* ── HIGHLIGHTS ── */
+    .highlight-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .highlight-item {
+      background: var(--jsm-card);
+      border-left: 3px solid var(--jsm-orange);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      border-top: 1px solid var(--jsm-border);
+      border-right: 1px solid var(--jsm-border);
+      border-bottom: 1px solid var(--jsm-border);
+    }
+    .highlight-item strong { color: var(--jsm-blue); }
+    .highlight-item.alert { border-left-color: var(--jsm-red); }
+    .highlight-item.good  { border-left-color: var(--jsm-green); }
+
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 32px;
+      background: var(--jsm-dark);
+      padding: 20px 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-left {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+    }
+    .footer-left strong { color: rgba(255,255,255,0.6); }
+    .footer-powered {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      text-align: right;
+    }
+    .footer-powered strong { color: var(--jsm-orange); }
+
+    .spacer { height: 28px; }
+    .spacer-sm { height: 16px; }
+
+    /* ── PONTOS CRÍTICOS & ATENÇÃO ── */
+    .alert-band {
+      padding: 0 36px;
+    }
+
+    .alert-panel {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid transparent;
+    }
+
+    .alert-panel + .alert-panel { margin-top: 10px; }
+
+    .alert-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 18px;
+    }
+    .alert-panel-header .alert-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+    .alert-panel-header .alert-title {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      flex: 1;
+    }
+    .alert-panel-header .alert-count {
+      font-family: 'Nunito', sans-serif;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    /* CRÍTICO */
+    .alert-panel.critico {
+      border-color: var(--jsm-red);
+      background: #FFF5F5;
+    }
+    .alert-panel.critico .alert-panel-header {
+      background: var(--jsm-red);
+      color: #fff;
+    }
+
+    /* ATENÇÃO */
+    .alert-panel.atencao {
+      border-color: #E8900A;
+      background: #FFFBF0;
+    }
+    .alert-panel.atencao .alert-panel-header {
+      background: #E8900A;
+      color: #fff;
+    }
+
+    .alert-items {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .alert-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 11px 18px;
+      border-top: 1px solid transparent;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .alert-panel.critico .alert-item { border-top-color: rgba(237,28,36,0.12); }
+    .alert-panel.atencao .alert-item { border-top-color: rgba(232,144,10,0.15); }
+
+    .alert-num {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 18px;
+      line-height: 1.2;
+      min-width: 22px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .alert-panel.critico .alert-num { color: var(--jsm-red); }
+    .alert-panel.atencao .alert-num { color: #C97A08; }
+
+    .alert-item-body strong {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .alert-panel.critico .alert-item-body strong { color: #B01018; }
+    .alert-panel.atencao .alert-item-body strong { color: #9A5E06; }
+
+    .alert-item-body span { color: var(--jsm-text-muted); }
+
+    /* se não houver itens */
+    .alert-empty {
+      padding: 12px 18px;
+      font-size: 12px;
+      color: var(--jsm-text-muted);
+      font-style: italic;
+    }
+
+    /* ── ORBIT DECORATION ── */
+    .orbit-dots {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .orbit-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ═══ HEADER ═══ -->
+  <div class="header">
+    <div class="header-top">
+      <div class="logo-area">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIUAAAA4CAYAAADTjjuXAAABhWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNi4wLjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iCiAgIGV4aWY6UGl4ZWxYRGltZW5zaW9uPSIxMzMiCiAgIGV4aWY6UGl4ZWxZRGltZW5zaW9uPSI1NiIvPgogPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4KPD94cGFja2V0IGVuZD0iciI/PmtfJvUAAAABc1JHQgCuzhzpAAAZSElEQVR4Ae2cB3SV1ZbH9303N4XQUSAgJYggoqCI2EAiit03Y++OLPUte/e5lvjsvY69jb2GXtHVGXtHVOwVFbEMFlSaglIFSW6S2+b/O8kJXy5fMLmw3spaZLO+fO20b+//2e2cS+TQQw/NWhu1cSDAgQKuv/vuu8Cjtsv1mQObbrqpRddnBrR9ezgH2kARzpf1+mkbKNZr8Yd/fBsowvmyXj9tA8V6Lf7wj28DRThf1uunbaBYr8Uf/vEuTxH+qhlPIxEV0pHNNF24oNgsk6o7AqUKCrOWSetxmjbCKRLNWjZL++Hvg08jGkuHDh2MM1RdXW01NTVWUlJihYWF7lk2m7U///xTba5qsLS01AoKVrFh+fLlFovFrH379q6O/0O9TGbVd9Jmu3btXFv0k0ql3L3v39fLPdfW1loikWh47PtinFyn02mrqqqyFStWNJTJvYhGo9axY0crLi52dRgXY1i5cqXR/trSKm60sKVYzyEWH7C9WazAUnM+s9Sv35ilGw+ooM8Iiw0eZ+nlCyz99YuWra770M49zIaNNUtlIvbNO2YrFjXuvKg0a703zVr3jTKWWBGxH6dFrXJ50+ChNkw955xzLB6PO2C88cYb9uabb9ree+9tI0aMcM8qKyvtqquucoynDgJURtc22WQTbh2QLr74Yttoo43shBNOaAAY755//nn75JNPHDAQynbbbefaRiBffvmle3fMMcdYUVERxUMJMH7xxRf25JNPurY33HBD23nnnW2rrbay7t27OyED5l9//dU+++wze//9923x4sUNbTFexlZRUWFbbLGFUR9gAIRly5bZ1KlT3Tj5zrWhvEARKxtq7fa71GJd+jpFYX/sbZWv/6clf5CEndaIWEGfkVa02z8s27m7WZVmZ02lpb963qKxjG2zb9Y2HVFj2cKM9RpUbJNui0nodZ8Ri2dt+K5pG1ZRZcWlKcsmIzZgyxJ7+c4iq000DQyEscsuuzhwwPxZs2bZ22+/bZtvvrmNHz/eEOSSJUvs6quvbsQvALP99gK3iJl2ySWXWLdu3Rrq+MKDBg2ygw46yN864ey6667untk9c+ZM4x4hhWkLxsSBAJ9++mkrLy+3iRMnGu0C6CANHz7cgYX2brzxRvv5559dm8OGDbOzzjrL1ckFH23TN5NhbUHRcp9CaC3c9giLdO1vEWkJjmjn3lY4/N8sUtTBfVukQy+LjDvb0h3LhJGIZQuKLFK2hVk0YnFZk259E0qlVutd2rr3q7GxR9UaYIDQIkN2rLKSjtUCUFbl09Z7YML6D82KMa7IGv8gEH9QEGZBYYJyL+r/hL337XDu16+fbbvttg5cVKFd/55r1Pcvv/xi8+bNs/nz57tWfZtLly51z3mPeUJ4l156qSFkAJFMJh2I0QyUoT1ME/2dffbZ1rlzZ2fOJkyYYJtttpmrj4b6/vvv7Z133rGPP/7Y1Vu0aJFrq/6T8j7lpSmiXXrXaQgJiQ9Ip7MWbdfJrEC2O1ZshTv83dKdelhWdjYlk5LSR0fkP1ApFovIj0jLBuvAX4hkrGyTSttsTAf75q0Ca9exDggRwSYbSRlWPBuNCUhZm/l53t+51hXRNGiR3XbbbTWAwQOAcOqppzrQdO3a1R566KEGH+GJJ55wah2Q4E+MGTPGzXbaRHO8/PLLdvfddzvzBUjOO+8822mnnZyvg6bbZpttnCbq37+/e0Z/AOjKK690YKRdgAa41uSLNJcJLdcUGlB2zlSLZaoFhqQ+Sk6WBpNcNFcmYqVFB42zbN8RlkwlLVWbkMpPyNWodQBpGFRWWEwVOdOQkXmIiTlbjK22rhL8HwujllgWl28ZU/GYO2cEjZ+/bPlQG/rL8wLmo4q984awMVEIM9dyNBcuXGi//fab/fHHH+419SHa8O9wWI866qiGNhYsWOAA9Pvvv7t61L/22msbNByOcEVFhXOWcUQ99enTx4GO9tA+1Mc8YsrWllb/uma0WPX+/VY99yurkeDleVlm/gyr/fB+i3bpbzbycKuNSWMICKlaNITmejItYNQNNiM+1VabJaqxrzFL1kjTCBjtOpqN2lcgS2Ttg6dLbfkivUsXCA4xmza5ky2cIzNUx+NmjHDdFYHhM2bMcMwGDGeeeWa9dsyP+UQ6rEQyuzEBc+bMsblzNaHqP44zwJg9e7Z7BhB69erlgIkZgqhbLp/k2WeftTvvvNMOPvhgA7A8XxeUl/mQ5CzxyEkWlV+RlMnILp5t1q6bRXY6zjLF3QSApARd6wARFQrSmkUx4k+EKowAgkyywLIyO5FoXPdJi2okPftlbMT4jH0+KWr/c2kH67ShZuryqFXVTbx18b0tbgOh3H777S5qwQGF+XvssUeL2/EVfHTEPaBA0B4QvgzCRYP0l7mACH/xWR5//HEHkC5dujotgbM5cuRIdxx77LF222232aRJkxo0m6ucx5+8NIXrR4jOLJ1tGQEi23WAxcZPtOyGmwkAaZkFRQ3Ob0g5G1pTlbBUTV24Ci6ymZgYIp8hLfPAOasjJS9CjujgUUnb8eCMGBGxJb/IBtdHJXl8m6vS3NmTKxjfH6BALRPuIUQEgfr3uQ9frrnnYD+MLZgj8W1QBvBAlOGevl977TUXfbz33ntuTJglnlNmgw02sFNOOcWGDh261hojf1Aw4sIO8iF2tciuEy3Vsa8lE9U6qqwGX6JavoY0BmCou16Vw8iko3I2BQxpCpzRrICEIklWJ3VOWb8hNbbzhFrrPkBAUQTSXAoDAAzlOQfq3zPbt+ntdFpdynj/ATvPbKUc6pywMR+iDYTpx9W7d+/VQlKAgnmgL8pRnnAZAHz99dcuIjnyyCPtsssucw4ofgRl0WTkL3K/saXjzBsUEfkP2Z1OtdSoYy0ZLbEaJV1qdeABp2tT7jolkKSlNYg2MCGOJON0KipHNKp3Mh2pAh3K5CV16JzROSX8dOySstEHVSsqUfytZFYYIVCYwVFWVtaIGd7hIvkDMyE8dJhGeQhTwAzjHuaHee6Agve8e+mll1w5sp0knXw7rrFm/mEsRA5BUBBhePBxJhT144Kf5EBIahGm8s20gWP5+uuv24UXXuje+e4Zmwe6f9bSc14+RaTrQMuOOcUSG5RbTLPb5Eym5HQi/KwGjAlJSlOYNEFG1xHN/rh8DJwK8R4fVLNOsYWuYxGZjlhUGoEoRA6qUtvO97CUFel22Nha69y9wKa+GLOaqlWOFAIhE0lmkdm31157NTCDSIAQEeaRwDr88MMdYADFSSedZHfccYebfXvuuacDE0xDSM8999xqgvagoK1bb73VZTEJG/NlPP089thjNnbsWAdSZvdpp51mDzzwgBsz+ZCTTz7ZyZGyZConT57sxn/00Uc7AJCf4DljGDVqlAMUZZkIZEMB0tpQy0ER0Yze+iiz0l6WSUi6GgBJKKILpxUEAkLUDGYBDZFMWDyVsYI/f4HzlqxVome5Io9SsziA4JA5wZ8gH0HeIlIg8CjzGdEzhNJrk7QNHV1g015Heqs+t3fvXnbMMf8h+17kGOxnPIAgYoBR7D/96KOP3MymLWwuahfgkBQCKJQj8YOwuA6SBwXPUOOPPPKIHX/88cEiLb5GqEQOBx54oBM20cgFF1zg2mems64BkdMgJY6mwJchXzFkyBC3NsI7xtapU6eGLC6JM8wL37Y21HJQqLdMSXdpg4xFAQNaQlM/I5OhqekAgS8BQFLSEDidxZWLrGTZNNWUsLUANvPTmG25W9QKihXOCmSRrDSMnM008aoMWgRlIZ8jotFlBAxBw0o7SUvkCIxb7G+RVArCZDZjLm6++WaXQeQZs+e6665zHnlwdnqmwUCAc8011zhm++f+DOM5INp/5pln7JBDDmkQnAdRU6bEv/ftcSbvcdddd7n8AsDAjAEEDwbqkNe4//77nYnwpgNg4OByJgLxRHs//fST3XTTTS6z6Z/ne46wxb+lu7mz3YdZYtiRloqViFHkGeQ3gE6ZC0JRBxTZwKycg5KqubbB71MsllqmMdbNQpzHrmVRGzJKkWwHCT2mkNQJH8dOoNB7YUQH5bWyuTRqn74QYwmlETFLKioq3Oyh3A8/zHQpX6IFTEqQWEFl0YkQrr9CPVQv2oGoghmGOvYCpN2tt97amRJA9fnnn7vVVdqjHj4ANt8TmonZ7Gco2meHHXZwr2mTd6Svc4lytIP2QgOQqCIZxWxHJowJQED027NnT9f3wIEDnZYDpPgW06dPd/kOcip+DLl9Nye+3YN96SGPhEw5mmf3T4SWH8JUfK3Ak17tD9OJ3Im7AAcGvMqooDTEvVnJa8ogLUBKJXSPpNnt7f/nlFkv1bKAVWxXOLZk08+JcdxmN1ww/Uu/fzSSy874fuy2GWYN2XKlFBA+HLY8cNkimB8kFDtmA42xnHtowbKkcDCOcXseEIwCAShsWu7KQJ8mIkDDjjA+UAk0AARayAksh588EEH1iBIcZTRduzg9oTvwkG/AOaMM85olILHDGEySasH2/L1WlLW18nnnBcoSKv0k/T6SJppTXPNdydkKX3DLUgzc6RMtOJhs1SuSpolKHgGWizTMLA0Y8M71bJ46nyJrCIQNAgUieN0Cjj68/H8qM1eEdUCWt273L/YWK8xEAYzhwMmBim3HIIAJLnlmIloFNr4K+FSlr4plytYZjY+QHBslMk1bX6MlKVf2mRMjG1NWoD2/WYg+qd87hh82y05txgUyOxv+jNGR1wDqZTQInIASD7hKErROjAkFUXUCBgJSXyqztMDwOigyOIfg5bb+O5LxDAJP5qSU6kopFA5AaW9nWOBXyFmY6pSW5td8kEXe3WWUuOBr4Mp+AmEnCxDe0FiY++5554Gx5FyJJxw6kg6AQ4YiK3Hu2fvhWcmTiX7L3bffXd799137YUXXmgSGLRLTmH//fd3vgghLe1CCJjEFH3iL/ixffvtt/boo486X8IDjnZwNvfZZx8bPXq0y0cABvwQnEd8pDDC2SS1zZjZrUU6/tNPPw0r2qJneYFiVKrQirWsnZRwY/og1jMQlia6KGsFCh9YFc/oHVHFltIciwSMuRIwRQ7sWW3jui2wuICg5ETdoesoYQfOJYeeR2hQzxjkPhsnbZJAEaSePXvYLbfcotmUcjkGPHZAAoM9wXAAQ3ThY34WoHr06OGWwdnEQrTCLi38Ahjct29ft/EGprPbCkcyjJilbLxBkD5vQDk0A47m6aef7jKR5BnIH7Brip1grLRefvnl9sEHHziNQK7i/PPPN1Y+X3nlFbephnAZ+57rPwTHAdAGDBjgAEdyjfHwvbmaL1inOdeNudyMGrhkH0WTNl5OpiSHnpAJIbTERAgMkqfuXFgZBRkCTonUyCZi+DytnsYl5F02WK7ElCIWVlPlbLpUtrSFc2BBjQcGaFObK2sK7Okf6tYC9KCBDj3sMOUZilzeYPnyFY4ZMAXyjCHTyW4rQraLLrqo0axDWCeeeKKde+65xgxGcJ5+/PFHp1HQLCxO+fb8e/rp37+/ixjQNEGiTwBBrgTAEeVQnzovvvii64+8BGsVjAtts/HGG7vxEXl4pxUtldtvsJ+w65aWD2tD07TlNFnCeku5BVOquliHlnV0aKZLK6RIbinBkCHJIKDoBW+syAFIJkcCLyogMYWp0HslrLQ5S5pF5cloOm3BM9oyW1xdbP81rbO9M68xfmFwP83oWbNmu9nomcHZX1PmiCOOcAkqtr6hhv17zqxQkt0k7ENAlPdEeEfSa9y4cS5B5J/7M7OUd7O1xB1U77SBOeHMsjbay4+HM3strr/+epeYQsugCdAgjIEcCyYlOEbfnz/Trh9n8Dr3fdg7X+avznmBIqGBvSjhPiYtsERCxKcAFGgN2Kpvd+aEeQ5Q6p57hvNRCFhAEiB4GhGQovUAqktUyEeRlvm/Re3tn+91tGd/1BqJ2mxMddnKwYMHaxfTYFXz7a8qBWPIS7BmgZC9cFaVMKf233rrLZfxDL5HOJiU8vJy50cE63CNNthyyy2d3+F9A54jZFLufoscz3KJsbDEzdjITaBpUP1stcPfCSPMGmsf5Fs4/G5uX5ZvBai0EzzWZH583dxz4+mX+3YN96SGPhEw5mmf3T4SWH8JUfK3Ak17tD9OJ3Im7AAcGvMqooDTEvVnJa8ogLUBKJXSPpNnt7f/nlFkv1bKAVWxXOLZk08+JcdxmN1ww/Uu/fzSSy874fuy2GWYN2XKlFBA+HLY8cNkimB8kFDtmA42xnHtowbKkcDCOcXseEIwCAShsWu7KQJ8mIkDDjjA+UAk0AARayAksh988EEH1iBIcZTRduzg9oTvwkG/AOaMM85olILHDGEySasH2/L1WlLW18nnnBcoSKv0k/T6SJppTXPNdydkKX3DLUgzc6RMtOJhs1SuSpolKHgGWizTMLA0Y8M71bJ46nyJrCIQNAgUieN0Cjj68/H8qM1eEdUCWt273L/YWK8xEAYzhwMmBim3HIIAJLnlmIloFNr4K+FSlr4plytYZjY+QHBslMk1bX6MlKVf2mRMjG1NWoD2/WYg+qd87hh82y05txgUyOxv+jNGR1wDqZTQInIASD7hKErROjAkFUXUCBgJSXyqztMDwOigyOIfg5bb+O5LxDAJP5qSU6kopFA5AaW9nWOBXyFmY6pSW5td8kEXe3WWUuOBr4Mp+AmEnCxDe0FiY++5554Gx5FyJJxw6kg6AQ4YiK3Hu2fvhWcmTiX7L3bffXd799137YUXXmgSGLRLTmH//fd3vgghLe1CCJjEFH3iL/ixffvtt/boo486X8IDjnZwNvfZZx8bPXq0y0cABvwQnEd8pDDC2SS1zZjZrUU6/tNPPw0r2qJneYFiVKrQirWsnZRwY/og1jMQlia6KGsFCh9YFc/oHVHFltIciwSMuRIwRQ7sWW3jui2wuICg5ETdoesoYQfOJYeeR2hQzxjkPhsnbZJAEaSePXvYLbfcotmUcjkGPHZAAoM9wXAAQ3ThY34WoHr06OGWwdnEQrTCLi38Ahjct29ft/EGprPbCkcyjJilbLxBkD5vQDk0A47m6aef7jKR5BnIH7Brip1grLRefvnl9sEHHziNQK7i/PPPN1Y+X3nlFbephnAZ+57rPwTHAdAGDBjgAEdyjfHwvbmaL1inOdeNudyMGrhkH0WTNl5OpiSHnpAJIbTERAgMkqfuXFgZBRkCTonUyCZi+DytnsYl5F02WK7ElCIWVlPlbLpUtrSFc2BBjQcGaFObK2sK7Okf6tYC9KCBDj3sMOUZilzeYPnyFY4ZMAXyjCHTyW4rQraLLrqo0axDWCeeeKKde+65xgxGcJ5+/PFHp1HQLCxO+fb8e/rp37+/ixjQNEGiTwBBrgTAEeVQnzovvvii64+8BGsVjAtts/HGG7vxEXl4pxUtldtvsJ+w65aWD2tD07TlNFnCeku5BVOquliHlnV0aKZLK6RIbinBkCHJIKDoBW+syAFIJkcCLyogMYWp0HslrLQ5S5pF5cloOm3BM9oyW1xdbP81rbO9M68xfmFwP83oWbNmu9nomcHZX1PmiCOOcAkqtr6hhv17zqxQkt0k7ENAlPdEeEfSa9y4cS5B5J/7M7OUd7O1xB1U77SBOeHMsjbay4+HM3strr/+epeYQsugCdAgjIEcCyYlOEbfnz/Trh9n8Dr3fdg7X+avznmBIqGBvSjhPiYtsERCxKcAFGgN2Kpvd+aEeQ5Q6p57hvNRCFhAEiB4GhGQovUAqktUyEeRlvm/Re3tn+91tGd/1BqJ2mxMddnKwYMHaxfTYFXz7a8qBWPIS7BmgZC9cFaVMKf233rrLZfxDL5HOJiU8vJy50cE63CNNthyyy2d3+F9A54jZFLufoscz3KJsbDEzdjITaBpUP1stcPfCSPMGmsf5Fs4/G5uX5ZvBai0EzzWZH583dxz4+mX+3YN96SGPhEw5mmf3T4SWH8JUfK3Ak17tD9OJ3Im7AAcGvMqooDTEvVnJa8ogLUBKJXSPpNnt7f/nlFkv1bKAVWxXOLZk08+JcdxmN1ww/Uu/fzSSy874fuy2GWYN2XKlFBA+HLY8cNkimB8kFDtmA42xnHtowbKkcDCOcXseEIwCAShsWu7KQJ8mIkDDjjA+UAk0AARayAksh988EEH1iBIcZTRduzg9oTvwkG/AOaMM85olILHDGEySasH2/L1WlLW18nnnBcoSKv0k/T6SJppTXPNdydkKX3DLUgzc6RMtOJhs1SuSpolKHgGWizTMLA0Y8M71bJ46nyJrCIQNAgUieN0Cjj68/H8qM1eEdUCWt273L/YWK8xEAYzhwMmBim3HIIAJLnlmIloFNr4K+FSlr4plytYZjY+QHBslMk1bX6MlKVf2mRMjG1NWoD2/WYg+qd87hh82y05txgUyOxv+jNGR1wDqZTQInIASD7hKErROjAkFUXUCBgJSXyqztMDwOigyOIfg5bb+O5LxDAJP5qSU6kopFA5AaW9nWOBXyFmY6pSW5td8kEXe3WWUuOBr4Mp+AmEnCxDe0FiY++5554Gx5FyJJxw6kg6AQ4YiK3Hu2fvhWcmTiX7L3bffXd799137YUXXmgSGLRLTmH//fd3vgghLe1CCJjEFH3iL/ixffvtt/boo486X8IDjnZwNvfZZx8bPXq0y0cABvwQnEd8pDDC2SS1zZjZrUU6/tNPPw0r2qJneYFiVKrQirWsnZRwY/og1jMQlia6KGsFCh9YFc/oHVHFltIciwSMuRIwRQ7sWW3jui2wuICg5ETdoesoYQfOJYeeR2hQzxjkPhsnbZJAEaQ==" alt="Juntos Somos+" style="height:40px;">
+      </div>
+
+      <div class="header-meta">
+        <span class="report-label">Relatório Diário · Engenharia</span>
+        <span class="report-date">{{DATA_HOJE}}</span>
+      </div>
+    </div>
+
+    <div class="header-hero">
+      <div class="header-title">
+        <h1>Panorama de <span>Desenvolvimento</span><br>das últimas {{PERIODO_HORAS}}</h1>
+        <p>Gerado automaticamente a partir dos dados de atividade da equipe · {{PERIODO_LABEL}}</p>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; align-items:flex-end; z-index:1;">
+        <div class="header-period">
+          <span class="period-label">Período analisado</span>
+          <span class="period-value">{{DATA_INICIO}} → {{DATA_FIM}}</span>
+        </div>
+        <div class="orbit-dots">
+          <div class="orbit-dot" style="background:var(--jsm-blue)"></div>
+          <div class="orbit-dot" style="background:var(--jsm-cyan)"></div>
+          <div class="orbit-dot" style="background:var(--jsm-orange)"></div>
+          <div class="orbit-dot" style="background:var(--jsm-green)"></div>
+          <div class="orbit-dot" style="background:var(--jsm-red)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="stripe"></div>
+
+  <!-- ═══ PONTOS CRÍTICOS & ATENÇÃO ═══ -->
+  <div style="height:22px"></div>
+  <div class="alert-band">
+
+    <!-- CRÍTICOS -->
+    <div class="alert-panel critico">
+      <div class="alert-panel-header">
+        <span class="alert-icon">🔴</span>
+        <span class="alert-title">Pontos Críticos</span>
+        <span class="alert-count">{{QTD_CRITICOS}}</span>
+      </div>
+      <div class="alert-items">
+        {{BLOCO_CRITICOS}}
+        <!-- Exemplo de item quando não há críticos:
+        <div class="alert-empty">Nenhum ponto crítico identificado no período. ✓</div>
+        -->
+      </div>
+    </div>
+
+    <!-- ATENÇÃO -->
+    <div class="alert-panel atencao">
+      <div class="alert-panel-header">
+        <span class="alert-icon">⚠️</span>
+        <span class="alert-title">Pontos de Atenção</span>
+        <span class="alert-count">{{QTD_ATENCAO}}</span>
+      </div>
+      <div class="alert-items">
+        {{BLOCO_ATENCAO}}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ 1. RESUMO EXECUTIVO ═══ -->
+  <div class="section">
+    <div class="section-title">
+      <div class="dot" style="background:var(--jsm-blue)"></div>
+      <h2>Resumo Executivo</h2>
+      <div class="line"></div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-icon">👩‍💻</div>
+        <div class="kpi-value">{{QTD_DEVS_ATIVOS}}</div>
+        <div class="kpi-label">Devs ativos</div>
+        <div class="kpi-delta up">↑ {{DELTA_DEVS}} vs ontem</div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-icon">🔀</div>
+        <div class="kpi-value">{{QTD_PRS}}</div>
+        <div class="kpi-label">PRs abertos/mergeados</div>
+        <div class="kpi-delta neutral">= estável</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-value">{{QTD_ISSUES_FECHADAS}}</div>
+        <div class="kpi-label">Issues resolvidas</div>
+        <div class="kpi-delta up">↑ {{DELTA_ISSUES}} vs ontem</div>
+      </div>
+      <div class="kpi-card cyan">
+        <div class="kpi-icon">🤖</div>
+        <div class="kpi-value">{{CUSTO_AI}}</div>
+        <div class="kpi-label">Custo IA (USD)</div>
+        <div class="kpi-delta down">↓ {{DELTA_CUSTO}} vs ontem</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ═══ 2. ATIVIDADE POR DESENVOLVEDOR ═══ -->
+  <div class="section">
+    <div class="section-title">
+      <div class="dot" style="background:var(--jsm-cyan)"></div>
+      <h2>Atividade por Desenvolvedor</h2>
+      <div class="line"></div>
+    </div>
+
+    <table class="dev-table">
+      <thead>
+        <tr>
+          <th>Desenvolvedor</th>
+          <th>PRs</th>
+          <th>Commits</th>
+          <th>Issues</th>
+          <th>Sessões IA</th>
+          <th>Nível de atividade</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- PLACEHOLDER — será preenchido dinamicamente -->
+        <tr>
+          <td>
+            <div class="dev-avatar" style="background:var(--jsm-blue)">RG</div>
+            <span class="dev-name">romulogomes</span>
+          </td>
+          <td>{{DEV_1_PRS}}</td>
+          <td>{{DEV_1_COMMITS}}</td>
+          <td>{{DEV_1_ISSUES}}</td>
+          <td>{{DEV_1_SESSOES}}</td>
+          <td>
+            <div class="activity-bar-wrap">
+              <div class="activity-bar"><div class="activity-bar-fill" style="width:{{DEV_1_PCT}}%;background:var(--jsm-blue)"></div></div>
+              <span class="activity-num">{{DEV_1_PCT}}%</span>
+            </div>
+          </td>
+          <td><span class="badge badge-green">Ativo</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="dev-avatar" style="background:var(--jsm-orange)">DV</div>
+            <span class="dev-name">developer2</span>
+          </td>
+          <td>{{DEV_2_PRS}}</td>
+          <td>{{DEV_2_COMMITS}}</td>
+          <td>{{DEV_2_ISSUES}}</td>
+          <td>{{DEV_2_SESSOES}}</td>
+          <td>
+            <div class="activity-bar-wrap">
+              <div class="activity-bar"><div class="activity-bar-fill" style="width:{{DEV_2_PCT}}%;background:var(--jsm-orange)"></div></div>
+              <span class="activity-num">{{DEV_2_PCT}}%</span>
+            </div>
+          </td>
+          <td><span class="badge badge-orange">Moderado</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="dev-avatar" style="background:var(--jsm-cyan)">MF</div>
+            <span class="dev-name">developer3</span>
+          </td>
+          <td>{{DEV_3_PRS}}</td>
+          <td>{{DEV_3_COMMITS}}</td>
+          <td>{{DEV_3_ISSUES}}</td>
+          <td>{{DEV_3_SESSOES}}</td>
+          <td>
+            <div class="activity-bar-wrap">
+              <div class="activity-bar"><div class="activity-bar-fill" style="width:{{DEV_3_PCT}}%;background:var(--jsm-cyan)"></div></div>
+              <span class="activity-num">{{DEV_3_PCT}}%</span>
+            </div>
+          </td>
+          <td><span class="badge badge-cyan">Ativo</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="dev-avatar" style="background:var(--jsm-red)">JP</div>
+            <span class="dev-name">developer4</span>
+          </td>
+          <td>{{DEV_4_PRS}}</td>
+          <td>{{DEV_4_COMMITS}}</td>
+          <td>{{DEV_4_ISSUES}}</td>
+          <td>{{DEV_4_SESSOES}}</td>
+          <td>
+            <div class="activity-bar-wrap">
+              <div class="activity-bar"><div class="activity-bar-fill" style="width:{{DEV_4_PCT}}%;background:var(--jsm-red)"></div></div>
+              <span class="activity-num">{{DEV_4_PCT}}%</span>
+            </div>
+          </td>
+          <td><span class="badge badge-red">Pouco ativo</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ═══ 3. PRs & ISSUES ═══ -->
+  <div class="section">
+    <div class="section-title">
+      <div class="dot" style="background:var(--jsm-orange)"></div>
+      <h2>PRs & Issues do período</h2>
+      <div class="line"></div>
+    </div>
+
+    <div class="card-list">
+      <div class="pr-card">
+        <div class="pr-icon merged">🔀</div>
+        <div class="pr-body">
+          <div class="pr-title">{{PR_1_TITULO}}</div>
+          <div class="pr-meta">
+            <span class="pr-repo">{{PR_1_REPO}}</span>
+            <span>#{{PR_1_NUM}}</span>
+            <span>por {{PR_1_AUTOR}}</span>
+            <span class="badge badge-blue">merged</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pr-card">
+        <div class="pr-icon open">🟢</div>
+        <div class="pr-body">
+          <div class="pr-title">{{PR_2_TITULO}}</div>
+          <div class="pr-meta">
+            <span class="pr-repo">{{PR_2_REPO}}</span>
+            <span>#{{PR_2_NUM}}</span>
+            <span>por {{PR_2_AUTOR}}</span>
+            <span class="badge badge-green">open</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pr-card">
+        <div class="pr-icon review">⏳</div>
+        <div class="pr-body">
+          <div class="pr-title">{{PR_3_TITULO}}</div>
+          <div class="pr-meta">
+            <span class="pr-repo">{{PR_3_REPO}}</span>
+            <span>#{{PR_3_NUM}}</span>
+            <span>por {{PR_3_AUTOR}}</span>
+            <span class="badge badge-orange">in review</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pr-card">
+        <div class="pr-icon issue">🎯</div>
+        <div class="pr-body">
+          <div class="pr-title">{{ISSUE_1_TITULO}}</div>
+          <div class="pr-meta">
+            <span class="pr-repo">{{ISSUE_1_REPO}}</span>
+            <span>#{{ISSUE_1_NUM}}</span>
+            <span>fechada por {{ISSUE_1_AUTOR}}</span>
+            <span class="badge badge-cyan">issue ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ═══ 4. USO DE IA & CUSTO ═══ -->
+  <div class="section">
+    <div class="section-title">
+      <div class="dot" style="background:var(--jsm-green)"></div>
+      <h2>Uso de IA & Custo</h2>
+      <div class="line"></div>
+    </div>
+
+    <div class="roi-grid">
+      <div class="roi-card">
+        <div class="roi-title">Custo total do período</div>
+        <div class="roi-val">{{CUSTO_TOTAL_USD}}</div>
+        <div class="roi-sub">Tokens de entrada + saída + cache</div>
+        <div class="spacer-sm"></div>
+        <table class="token-table">
+          <tr>
+            <td style="color:var(--jsm-text-muted)">Input tokens</td>
+            <td>{{INPUT_TOKENS}}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--jsm-text-muted)">Output tokens</td>
+            <td>{{OUTPUT_TOKENS}}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--jsm-text-muted)">Cache read</td>
+            <td>{{CACHE_TOKENS}}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--jsm-text-muted)">Total tokens</td>
+            <td style="color:var(--jsm-blue)">{{TOTAL_TOKENS}}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="roi-card">
+        <div class="roi-title">Top consumidores (IA)</div>
+        <div class="spacer-sm"></div>
+        <table class="token-table">
+          <tr>
+            <td>
+              <div class="dev-avatar" style="background:var(--jsm-blue);width:22px;height:22px;font-size:9px;display:inline-flex;">RG</div>
+              {{DEV_1_NOME}}
+            </td>
+            <td>{{DEV_1_CUSTO}}</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="dev-avatar" style="background:var(--jsm-orange);width:22px;height:22px;font-size:9px;display:inline-flex;">DV</div>
+              {{DEV_2_NOME}}
+            </td>
+            <td>{{DEV_2_CUSTO}}</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="dev-avatar" style="background:var(--jsm-cyan);width:22px;height:22px;font-size:9px;display:inline-flex;">MF</div>
+              {{DEV_3_NOME}}
+            </td>
+            <td>{{DEV_3_CUSTO}}</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="dev-avatar" style="background:var(--jsm-red);width:22px;height:22px;font-size:9px;display:inline-flex;">JP</div>
+              {{DEV_4_NOME}}
+            </td>
+            <td>{{DEV_4_CUSTO}}</td>
+          </tr>
+        </table>
+        <div class="spacer-sm"></div>
+        <div style="padding:10px;background:rgba(27,79,168,0.05);border-radius:8px;border:1px dashed var(--jsm-border);">
+          <div style="font-size:10px;color:var(--jsm-text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Média por dev/dia</div>
+          <div style="font-family:'Nunito',sans-serif;font-size:22px;font-weight:900;color:var(--jsm-orange);margin-top:2px;">{{MEDIA_CUSTO_DEV}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ═══ 5. DESTAQUES & ALERTAS ═══ -->
+  <div class="section">
+    <div class="section-title">
+      <div class="dot" style="background:var(--jsm-red)"></div>
+      <h2>Destaques & Alertas</h2>
+      <div class="line"></div>
+    </div>
+
+    <div class="highlight-list">
+      <div class="highlight-item good">
+        <strong>✅ Alto volume de entregas:</strong> {{HIGHLIGHT_1}}
+      </div>
+      <div class="highlight-item">
+        <strong>🔍 Em revisão:</strong> {{HIGHLIGHT_2}}
+      </div>
+      <div class="highlight-item alert">
+        <strong>⚠️ Atenção:</strong> {{ALERTA_1}}
+      </div>
+      <div class="highlight-item">
+        <strong>💡 Observação:</strong> {{HIGHLIGHT_3}}
+      </div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer">
+    <div class="footer-left">
+      Relatório gerado automaticamente em <strong>{{DATA_GERACAO}}</strong><br>
+      Dados coletados via <strong>Cogniscape · GitHub · Claude Code</strong>
+    </div>
+    <div class="footer-powered">
+      Powered by<br>
+      <strong>Cogniscape.app</strong>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

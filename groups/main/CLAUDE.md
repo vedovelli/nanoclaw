@@ -40,12 +40,53 @@ When working as a sub-agent or teammate, only use `send_message` if instructed t
 
 ## Memory
 
-The `conversations/` folder contains searchable history of past conversations. Use this to recall context from previous sessions.
+**Memory is stored in Obsidian.** Do NOT use local files for memory. All notes, preferences, and structured data go to the Obsidian vault via the Local REST API.
 
-When you learn something important:
-- Create files for structured data (e.g., `customers.md`, `preferences.md`)
-- Split files larger than 500 lines into folders
-- Keep an index in your memory for the files you create
+### Obsidian API Access
+
+```
+Host: host.docker.internal
+Port: 27124 (env: OBSIDIAN_PORT)
+Key:  $OBSIDIAN_API_KEY (already in environment)
+Base URL: https://host.docker.internal:27124
+```
+
+Always use `-k` flag (self-signed cert). Examples:
+
+```bash
+# List vault root
+curl -s -k -H "Authorization: Bearer $OBSIDIAN_API_KEY" \
+  "https://$OBSIDIAN_HOST:$OBSIDIAN_PORT/vault/"
+
+# Read a note
+curl -s -k -H "Authorization: Bearer $OBSIDIAN_API_KEY" \
+  "https://$OBSIDIAN_HOST:$OBSIDIAN_PORT/vault/path/to/note.md"
+
+# Write a note
+curl -s -k -X PUT \
+  -H "Authorization: Bearer $OBSIDIAN_API_KEY" \
+  -H "Content-Type: text/markdown" \
+  --data-binary "# Note content" \
+  "https://$OBSIDIAN_HOST:$OBSIDIAN_PORT/vault/path/to/note.md"
+
+# Search
+curl -s -k -X POST \
+  -H "Authorization: Bearer $OBSIDIAN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "search term"}' \
+  "https://$OBSIDIAN_HOST:$OBSIDIAN_PORT/search/simple/"
+```
+
+### Vault Structure (known folders)
+
+- `nanoclaw/` — notes, plans, sessions, reports, reviews, skills, implementations
+- `cogniscape/` — product notes
+- `main/` — general notes
+- `ved/` — personal notes
+
+Store new memories under `nanoclaw/` unless context suggests another folder.
+
+The `conversations/` folder contains legacy conversation history (read-only reference).
 
 ## WhatsApp Formatting (and other messaging apps)
 
