@@ -505,7 +505,6 @@ async function runQuery(
         'mcp__flare__*',
         'mcp__mcp-obsidian__*',
         'mcp__cogniscape__*',
-        'mcp__juntos__*',
         /* ved custom end */
       ],
       env: sdkEnv,
@@ -556,10 +555,6 @@ async function runQuery(
         cogniscape: {
           type: 'http' as const,
           url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=6fc967e7380a466c81a2e52086d96124bdd2b110f07b4a4b81d4812851776be2',
-        },
-        juntos: {
-          type: 'http' as const,
-          url: 'https://api.cogniscape.app/mcp-reader/mcp?customer_key=d431035514bd4f9d9647de83624200b7f0c67d8d0134487eb430145b9cf4d697',
         },
         /* ved custom end */
       },
