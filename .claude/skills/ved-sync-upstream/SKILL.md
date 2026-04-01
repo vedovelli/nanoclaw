@@ -295,7 +295,7 @@ Verify custom skills are intact:
 ```bash
 ls container/skills/
 ```
-`flare-monitor/`, `send-link/` and `competitor-monitor/` must be present.
+`flare-monitor/` and `send-link/` must be present.
 
 Verify the X integration IPC handler is intact in `src/ipc.ts` (the `spawn` import and the `x_*` handler block in the `default` case) and the X MCP tools block is intact in `container/agent-runner/src/ipc-mcp-stdio.ts`.
 
